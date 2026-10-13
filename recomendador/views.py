@@ -63,3 +63,9 @@ def organizar_rutina(categoria, disponibilidad):
             rutina[dia] = f"{bloque} -> {ejercicio}"
             contador += 1
     return rutina
+
+
+from django.http import HttpResponse
+
+def vista_principal(request):
+    return HttpResponse("<h1>¡El cerebro de la App para Sansanos está conectado!</h1> <p>Pronto aquí irá el formulario.</p>")
