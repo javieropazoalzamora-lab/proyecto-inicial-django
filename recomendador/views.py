@@ -67,5 +67,67 @@ def organizar_rutina(categoria, disponibilidad):
 
 from django.http import HttpResponse
 
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from core.models import PerfilSansano
+import ast # Para convertir el texto de bloques libres a un diccionario real
+
+@login_required
 def vista_principal(request):
-    return HttpResponse("<h1>¡El cerebro de la App para Sansanos está conectado!</h1> <p>Pronto aquí irá el formulario.</p>")
+    try:
+        perfil = PerfilSansano.objects.get(usuario=request.user)
+    except PerfilSansano.DoesNotExist:
+        # Si el usuario no ha llenado la encuesta, lo mandamos allá
+        return redirect('formulario') 
+
+    # 1. Recuperar los datos
+    peso = perfil.peso
+    altura = perfil.altura
+    # Convertir el texto guardado en un diccionario real de Python
+    disponibilidad = ast.literal_eval(perfil.bloques_libres) 
+    
+    # 2. Hacer los cálculos con tu lógica
+    imc = calcular_imc(peso, altura)
+    categoria = clasificar_imc(imc)
+    habitos = generar_habitos(categoria)
+    rutina = organizar_rutina(categoria, disponibilidad)
+
+    # 3. Preparar los datos para enviarlos al diseño visual
+    contexto = {
+        'imc': round(imc, 1),
+        'categoria': categoria,
+        'habitos': habitos,
+        'rutina': rutina,
+        'peso_actual': peso,
+        # Puedes calcular una meta básica, por ejemplo, perder 4kg si hay sobrepeso, o ganar si hay bajo peso.
+        # Por ahora lo dejamos fijo o puedes crear una función para esto.
+        'meta_peso': peso - 4 if categoria in ['Sobrepeso', 'Obesidad'] else (peso + 4 if categoria == 'Bajo peso' else peso), 
+    }
+
+    # 4. Enviar todo a la plantilla de resultados (asegúrate de que el nombre del archivo html sea el correcto)
+    return render(request, 'core2/inicio.html', contexto)
+
+# Asegúrate de tener estas importaciones en la parte superior
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from core.models import PerfilSansano
+@login_required
+def encuesta_datos(request):
+    if request.method == 'POST':
+        peso = request.POST.get('peso')
+        altura = request.POST.get('altura')
+        
+        dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
+        bloques = {dia: request.POST.get(dia, 'Sin tiempo libre') for dia in dias}
+        
+        PerfilSansano.objects.update_or_create(
+            usuario=request.user,
+            defaults={
+                'peso': float(peso.replace(',', '.')),
+                'altura': float(altura.replace(',', '.')),
+                'bloques_libres': str(bloques)
+            }
+        )
+        return redirect('inicio')
+        
+    return render(request, 'core2/formulario.html')
