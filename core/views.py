@@ -32,7 +32,7 @@ def registrar_usuario(request):
 
 
 @login_required
-def encuesta_datos(request):
+def formulario(request):
     if request.method == 'POST':
         peso = request.POST.get('peso')
         altura = request.POST.get('altura')
