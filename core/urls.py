@@ -8,4 +8,5 @@ urlpatterns = [
     path('logout/', views.cerrar_sesion, name='logout'),
     path('encuesta/', views.encuesta_datos, name='encuesta_datos'),
     path('portal/', views.portal, name='portal'),
+    path('activar/<uidb64>/<token>/', views.activar_cuenta, name='activar_cuenta'),
 ]

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Registro Institucional</h2>
+
+    <!-- Bloque nuevo para atrapar y mostrar errores -->
+    {% if form.errors %}
+        <div style="color: red; border: 1px dashed red; padding: 10px; margin-bottom: 15px;">
+            <strong>Error en el registro:</strong>
+            <ul>
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Registrarse</button>
+    </form>
+</body>
+</html>
