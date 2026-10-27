@@ -79,6 +79,34 @@ def cerrar_sesion(request):
 
 # 5. Vista de Encuesta (Renombrada para coincidir con urls.py)
 @login_required
+def editar_perfil(request):
+    # Busca si el usuario ya tiene datos guardados
+    try:
+        perfil = PerfilSansano.objects.get(usuario=request.user)
+    except PerfilSansano.DoesNotExist:
+        perfil = None
+
+    if request.method == 'POST':
+        peso = request.POST.get('peso')
+        altura = request.POST.get('altura')
+        
+        dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
+        bloques = {dia: request.POST.get(dia, 'Sin tiempo libre') for dia in dias}
+        
+        if peso and altura:
+            PerfilSansano.objects.update_or_create(
+                usuario=request.user,
+                defaults={
+                    'peso': float(peso.replace(',', '.')),
+                    'altura': float(altura.replace(',', '.')),
+                    'bloques_libres': str(bloques)
+                }
+            )
+        return redirect('portal')
+        
+    return render(request, 'core2/formulario.html', {'perfil': perfil})
+
+@login_required
 def encuesta_datos(request):
     if request.method == 'POST':
         peso = request.POST.get('peso')

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cambiar Contraseña</title>
+</head>
+<body>
+    <h2>Ajustes de Cuenta: Cambiar Contraseña</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Guardar nueva contraseña</button>
+    </form>
+    <br>
+    <a href="{% url 'encuesta_datos' %}">Volver al inicio</a>
+</body>
+</html>
