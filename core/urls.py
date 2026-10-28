@@ -7,7 +7,7 @@ urlpatterns = [
     path('registro/', views.registrar_usuario, name='registro'),
     path('login/', views.iniciar_sesion, name='login'),
     path('logout/', views.cerrar_sesion, name='logout'),
-    path('encuesta/', views.encuesta_datos, name='encuesta_datos'),
+    path('formulario/', views.encuesta_datos, name='encuesta_datos'),
     path('portal/', views.portal, name='portal'),
     path('activar/<uidb64>/<token>/', views.activar_cuenta, name='activar_cuenta'),
     path('ajustes/clave/', auth_views.PasswordChangeView.as_view(template_name='core2/cambiar_clave.html'), name='cambiar_clave'),
