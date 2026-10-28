@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -5,81 +6,146 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}VitaSansano{% endblock %}</title>
   
-  <!-- Fuente del diseño Menta -->
+  <!-- Fuente Figtree -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <style>
-    /* Variables exclusivas del Diseño Menta */
-    *{box-sizing:border-box;margin:0}
-    :root{
-      --bg:#F3F7F3;
-      --surface:#fff;
-      --ink:#1D2B24;
-      --mute:#5F7168;
-      --accent:#2F7D55;
-      --ac:#fff;
-      --soft:#DDEEE3;
-      --line:#D5E3DA;
-      --head:'Figtree',system-ui,sans-serif;
-      --rc:16px; /* Radio de tarjetas */
-      --ri:10px; /* Radio de inputs */
-      --rb:999px; /* Radio de botones */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    :root {
+      --bg: #F3F7F3;
+      --surface: #fff;
+      --ink: #1D2B24;
+      --mute: #5F7168;
+      --accent: #2F7D55;
+      --ac: #fff;
+      --soft: #DDEEE3;
+      --line: #D5E3DA;
+      --error: #D9534F;
+      --head: 'Figtree', system-ui, sans-serif;
+      --rc: 16px;
+      --ri: 10px;
+      --rb: 999px;
     }
     
-    body{
-      background:var(--bg);
-      color:var(--ink);
-      font:15px/1.5 system-ui,sans-serif;
-      font-family:var(--head);
-      min-height:100vh;
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--head);
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     
-    a{text-decoration:none;color:inherit}
-    button,select,input{font:inherit;color:inherit}
-    button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    a { text-decoration: none; color: inherit; }
+    button, select, input { font: inherit; color: inherit; }
 
-    /* Barra de Navegación */
-    .nav{display:flex;align-items:center;gap:24px;padding:18px 32px;border-bottom:1px solid var(--line);background:var(--surface)}
-    .brand{font:700 20px var(--head);display:flex;align-items:center;gap:10px}
-    .brand i{width:14px;height:14px;border-radius:50%;background:var(--accent);display:block}
-    .nav nav{display:flex;gap:4px;margin-left:auto}
-    .nav nav a{color:var(--mute);padding:8px 16px;border-radius:var(--rb);font-weight:500;transition:0.2s}
-    .nav nav a:hover, .nav nav a.on{background:var(--soft);color:var(--ink);font-weight:600}
+    /* BARRA SUPERIOR (Alineada de borde a borde) */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 16px 40px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
 
-    /* Contenedor Principal */
-    main{padding:36px 32px 56px;max-width:1040px;margin:0 auto;width:100%}
-    .btn{background:var(--accent);color:var(--ac);border:0;border-radius:var(--rb);padding:13px 26px;font-weight:600;cursor:pointer;display:inline-block;text-align:center}
-    .btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
-    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--rc);padding:24px}
+    .brand {
+      font: 700 20px var(--head);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .brand i {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: inline-block;
+    }
+
+    .nav nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav nav a {
+      color: var(--mute);
+      padding: 8px 16px;
+      border-radius: var(--rb);
+      font-weight: 500;
+      transition: 0.2s;
+    }
+
+    .nav nav a:hover, .nav nav a.on {
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    /* CONTENEDOR PRINCIPAL (Centra las tarjetas) */
+    main {
+      width: 100%;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: var(--ac);
+      border: 0;
+      border-radius: var(--rb);
+      padding: 13px 26px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-block;
+      text-align: center;
+      transition: 0.2s;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--rc);
+      padding: 24px;
+      width: 100%;
+    }
   </style>
   
-  <!-- Espacio para agregar CSS específico de otras páginas -->
   {% block extra_head %}{% endblock %}
 </head>
 <body>
 
   <!-- Cabecera global -->
   <header class="nav">
-    <div class="brand"><i></i>VitaSansano</div>
+    <a href="{% url 'inicio' %}" class="brand"><i></i>VitaSansano</a>
     <nav>
-      <!-- Reemplazar los # por etiquetas de URL de Django (ej: {% url 'inicio' %}) cuando existan las rutas -->
-      <a href="#">Inicio</a>
-      <a href="#">Mis datos</a>
-      <a href="#">Mi plan</a>
-      <a href="#">Portal</a>
-      <a href="#">Entrar</a>
+      <a href="{% url 'inicio' %}" class="{% if request.resolver_match.url_name == 'inicio' %}on{% endif %}">Inicio</a>
+      <a href="{% url 'encuesta_datos' %}" class="{% if request.resolver_match.url_name == 'encuesta_datos' %}on{% endif %}">Mis datos</a>
+      <a href="#" class="{% if request.resolver_match.url_name == 'horarios' %}on{% endif %}">Mi plan</a>
+      <a href="{% url 'portal' %}" class="{% if request.resolver_match.url_name == 'portal' %}on{% endif %}">Portal</a>
+      <a href="{% url 'login' %}" class="{% if request.resolver_match.url_name == 'login' %}on{% endif %}">Entrar</a>
     </nav>
   </header>
 
-  <!-- Contenido dinámico (aquí se inyecta el código de las demás páginas) -->
+  <!-- Contenido principal -->
   <main>
     {% block content %}
     {% endblock %}
   </main>
 
-  <!-- Espacio para scripts específicos de otras páginas -->
   {% block extra_js %}{% endblock %}
 </body>
 </html>
