@@ -12,6 +12,15 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 
+BLOQUES_VALIDOS = [
+    '8:15-9:25', 
+    '9:40-10:50', 
+    '11:05-12:15', 
+    '12:30-13:40', 
+    '14:40-15:50', 
+    '16:05-17:15', 
+    '17:30-18:40'
+]
 # 1. Vista de Inicio (La que causaba el error)
 def inicio(request):
     return redirect('login') 
@@ -109,23 +118,53 @@ def editar_perfil(request):
 @login_required
 def encuesta_datos(request):
     if request.method == 'POST':
-        peso = request.POST.get('peso')
-        altura = request.POST.get('altura')
+        # 1. Obtener peso y altura enviados desde el formulario
+        peso_str = request.POST.get('peso', '0').replace(',', '.')
+        altura_str = request.POST.get('altura', '0').replace(',', '.')
         
+        try:
+            peso = float(peso_str)
+            altura = float(altura_str)
+        except ValueError:
+            peso = 0.0
+            altura = 0.0
+
+        # Si la altura la ingresan en centímetros (ej: 175), la pasamos a metros (1.75)
+        altura_m = altura / 100 if altura > 3 else altura
+
+        # 2. Calcular el IMC (IMC = peso / altura^2)
+        imc = round(peso / (altura_m ** 2), 2) if altura_m > 0 else 0.0
+
+        # 3. Obtener el bloque seleccionado para cada día
         dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
-        bloques = {dia: request.POST.get(dia, 'Sin tiempo libre') for dia in dias}
+        bloques = {}
         
+        for dia in dias:
+            bloque_seleccionado = request.POST.get(dia)
+            # Validamos que el bloque seleccionado esté dentro de las opciones permitidas
+            if bloque_seleccionado in BLOQUES_VALIDOS:
+                bloques[dia] = bloque_seleccionado
+            else:
+                bloques[dia] = 'Sin tiempo libre'
+
+        # 4. Guardar o actualizar en la base de datos
         PerfilSansano.objects.update_or_create(
             usuario=request.user,
             defaults={
-                'peso': float(peso.replace(',', '.')),
-                'altura': float(altura.replace(',', '.')),
-                'bloques_libres': str(bloques)
+                'peso': peso,
+                'altura': altura,
+                'imc': imc,                     # Campo para almacenar el IMC
+                'bloques_libres': str(bloques)  # Guarda el diccionario como texto o JSON
             }
         )
+
+        # 5. Redirigir a la vista del portal tras presionar "Generar"
         return redirect('portal')
-        
-    return render(request, 'core2/formulario.html')
+
+    # Si es petición GET, se renderiza el formulario
+    return render(request, 'core2/formulario.html', {
+        'bloques_horarios': BLOQUES_VALIDOS
+    })
 
 # 6. Vista del Portal
 @login_required

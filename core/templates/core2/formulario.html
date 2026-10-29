@@ -1,0 +1,96 @@
+<form method="POST">
+    {% csrf_token %}
+    
+    <!-- Campos de Peso y Altura -->
+    <div>
+        <label>Peso (kg):</label>
+        <input type="number" step="0.1" name="peso" required>
+    </div>
+
+    <div>
+        <label>Altura (cm o m):</label>
+        <input type="number" step="0.01" name="altura" required>
+    </div>
+
+    <h3>Bloques Libres por Día</h3>
+
+    <!-- LUNES -->
+    <div>
+        <label for="lunes">Lunes:</label>
+        <select name="lunes" id="lunes">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- MARTES -->
+    <div>
+        <label for="martes">Martes:</label>
+        <select name="martes" id="martes">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- MIÉRCOLES -->
+    <div>
+        <label for="miercoles">Miércoles:</label>
+        <select name="miercoles" id="miercoles">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- JUEVES -->
+    <div>
+        <label for="jueves">Jueves:</label>
+        <select name="jueves" id="jueves">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- VIERNES -->
+    <div>
+        <label for="viernes">Viernes:</label>
+        <select name="viernes" id="viernes">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- SÁBADO -->
+    <div>
+        <label for="sabado">Sábado:</label>
+        <select name="sabado" id="sabado">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- DOMINGO -->
+    <div>
+        <label for="domingo">Domingo:</label>
+        <select name="domingo" id="domingo">
+            <option value="Sin tiempo libre">Sin tiempo libre</option>
+            {% for bloque in bloques_horarios %}
+                <option value="{{ bloque }}">{{ bloque }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <br>
+    <button type="submit">Generar</button>
+</form>
