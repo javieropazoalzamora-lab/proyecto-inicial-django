@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Alimentación</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Tarjeta de Resumen de Usuario */
+        .card-perfil {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+
+        .card-perfil h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: #eef2f5;
+            padding: 12px 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-item span {
+            display: block;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .info-item strong {
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        /* Sección de Rutina Semanal */
+        .titulo-rutina {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .rutina-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 18px;
+        }
+
+        .dia-card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 5px solid #27ae60;
+        }
+
+        .dia-card h4 {
+            margin: 0 0 12px 0;
+            color: #27ae60;
+            font-size: 1.2em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 6px;
+        }
+
+        .comida-item {
+            margin-bottom: 10px;
+        }
+
+        .comida-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .comida-titulo {
+            font-weight: bold;
+            color: #34495e;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .comida-desc {
+            margin: 3px 0 0 0;
+            font-size: 0.95em;
+            color: #555;
+            line-height: 1.3;
+        }
+
+        /* Botón de regreso / sin datos */
+        .btn-encuesta {
+            display: inline-block;
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 18px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .btn-encuesta:hover {
+            background-color: #219150;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    {% if perfil %}
+        <!-- Resumen del Usuario -->
+        <div class="card-perfil">
+            <h2>Mi Plan Alimenticio</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span>Peso</span>
+                    <strong>{{ perfil.peso }} kg</strong>
+                </div>
+                <div class="info-item">
+                    <span>Altura</span>
+                    <strong>{{ perfil.altura }} m</strong>
+                </div>
+                <div class="info-item">
+                    <span>IMC Calculado</span>
+                    <strong>{{ perfil.imc }}</strong>
+                </div>
+            </div>
+            <p style="margin-top: 15px; font-size: 0.95em;">
+                <strong>Estado:</strong> <span style="color: #27ae60;">{{ tipo_imc }}</span>
+            </p>
+        </div>
+
+        <!-- Rutina Semanal por Días -->
+        <h3 class="titulo-rutina">Sugerencia de Menú de Lunes a Domingo</h3>
+        
+        <div class="rutina-grid">
+            {% for dia, comidas in rutina.items %}
+                <div class="dia-card">
+                    <h4>{{ dia }}</h4>
+                    
+                    <div class="comida-item">
+                        <span class="comida-titulo">🍳 Desayuno</span>
+                        <p class="comida-desc">{{ comidas.desayuno }}</p>
+                    </div>
+                    
+                    <div class="comida-item">
+                        <span class="comida-titulo">🥗 Almuerzo</span>
+                        <p class="comida-desc">{{ comidas.almuerzo }}</p>
+                    </div>
+                    
+                    <div class="comida-item">
+                        <span class="comida-titulo">☕ Once</span>
+                        <p class="comida-desc">{{ comidas.once }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+    {% else %}
+        <!-- Estado sin datos previos -->
+        <div class="card-perfil" style="text-align: center;">
+            <h2>Aún no has ingresado tus datos</h2>
+            <p>Para generar una rutina de alimentación personalizada, por favor completa primero el formulario de salud.</p>
+            <a href="{% url 'encuesta_datos' %}" class="btn-encuesta">Ir a la Encuesta</a>
+        </div>
+    {% endif %}
+
+</div>
+<!-- Rutina de Ejercicios Adaptada a Horarios e IMC -->
+        <h3 class="titulo-rutina" style="margin-top: 30px;">Plan de Actividad Física y Bloques Horarios</h3>
+        
+        <div class="rutina-grid">
+            {% for dia, ejercicio in ejercicios.items %}
+                <div class="dia-card" style="border-left-color: #3498db;">
+                    <h4 style="color: #3498db;">{{ dia }}</h4>
+                    <div class="comida-item">
+                        <span class="comida-titulo">🏋️‍♂️ Actividad sugerida</span>
+                        <p class="comida-desc">{{ ejercicio }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+</body>
+</html>
