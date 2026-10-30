@@ -1,96 +1,212 @@
-<form method="POST">
-    {% csrf_token %}
-    
-    <!-- Campos de Peso y Altura -->
-    <div>
-        <label>Peso (kg):</label>
-        <input type="number" step="0.1" name="peso" required>
-    </div>
+{% extends "core2/base.html" %}
 
-    <div>
-        <label>Altura (cm o m):</label>
-        <input type="number" step="0.01" name="altura" required>
-    </div>
+{% block title %}Mis Datos | VitaSansano{% endblock %}
 
-    <h3>Bloques Libres por Día</h3>
+{% block extra_head %}
+<style>
+  .encuesta-container {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+  }
 
-    <!-- LUNES -->
-    <div>
+  /* Alerta visual con animación de parpadeo lento */
+  .alert-error {
+    background-color: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+    padding: 12px 16px;
+    border-radius: var(--ri);
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    animation: parpadeoLento 2.5s infinite ease-in-out;
+  }
+
+  @keyframes parpadeoLento {
+    0% { opacity: 1; }
+    50% { opacity: 0.55; }
+    100% { opacity: 1; }
+  }
+
+  .fm-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .fm-full {
+    grid-column: span 2;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .form-group input,
+  .form-group select {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--ri);
+    padding: 11px 14px;
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+
+  .form-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 20px 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  @media (max-width: 580px) {
+    .fm-grid {
+      grid-template-columns: 1fr;
+    }
+    .fm-full {
+      grid-column: span 1;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="encuesta-container">
+  <div class="card">
+    <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Mis Datos y Horarios</h2>
+    <p style="color: var(--mute); font-size: 14px; margin-bottom: 20px;">
+      Ingresa tu información corporal y selecciona tus bloques libres para generar tu plan.
+    </p>
+
+    <!-- Alertas de error enviadas desde Django -->
+    {% if error %}
+      <div class="alert-error">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form method="POST" class="fm-grid">
+      {% csrf_token %}
+
+      <!-- Sección 1: Datos Físicos -->
+      <div class="fm-full form-section-title">1. Información Corporal</div>
+
+      <div class="form-group">
+        <label for="peso">Peso (kg):</label>
+        <input type="number" step="0.1" min="0.1" name="peso" id="peso" value="{{ peso_val|default:'' }}" placeholder="Ej: 70.5" required>
+      </div>
+
+      <div class="form-group">
+        <label for="altura">Altura (cm o m):</label>
+        <input type="number" step="0.01" min="0.1" name="altura" id="altura" value="{{ altura_val|default:'' }}" placeholder="Ej: 175 o 1.75" required>
+      </div>
+
+      <!-- Sección 2: Horarios Libres -->
+      <div class="fm-full form-section-title">2. Bloques Libres por Día</div>
+
+      <!-- LUNES -->
+      <div class="form-group">
         <label for="lunes">Lunes:</label>
         <select name="lunes" id="lunes">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- MARTES -->
-    <div>
+      <!-- MARTES -->
+      <div class="form-group">
         <label for="martes">Martes:</label>
         <select name="martes" id="martes">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- MIÉRCOLES -->
-    <div>
+      <!-- MIÉRCOLES -->
+      <div class="form-group">
         <label for="miercoles">Miércoles:</label>
         <select name="miercoles" id="miercoles">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- JUEVES -->
-    <div>
+      <!-- JUEVES -->
+      <div class="form-group">
         <label for="jueves">Jueves:</label>
         <select name="jueves" id="jueves">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- VIERNES -->
-    <div>
+      <!-- VIERNES -->
+      <div class="form-group">
         <label for="viernes">Viernes:</label>
         <select name="viernes" id="viernes">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- SÁBADO -->
-    <div>
+      <!-- SÁBADO -->
+      <div class="form-group">
         <label for="sabado">Sábado:</label>
         <select name="sabado" id="sabado">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <!-- DOMINGO -->
-    <div>
+      <!-- DOMINGO -->
+      <div class="form-group fm-full">
         <label for="domingo">Domingo:</label>
         <select name="domingo" id="domingo">
-            <option value="Sin tiempo libre">Sin tiempo libre</option>
-            {% for bloque in bloques_horarios %}
-                <option value="{{ bloque }}">{{ bloque }}</option>
-            {% endfor %}
+          <option value="Sin tiempo libre">Sin tiempo libre</option>
+          {% for bloque in bloques_horarios %}
+            <option value="{{ bloque }}">{{ bloque }}</option>
+          {% endfor %}
         </select>
-    </div>
+      </div>
 
-    <br>
-    <button type="submit">Generar</button>
-</form>
+      <!-- Botón de Envío -->
+      <div class="fm-full" style="margin-top: 12px;">
+        <button type="submit" class="btn" style="width: 100%;">Generar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

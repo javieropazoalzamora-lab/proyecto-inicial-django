@@ -115,7 +115,7 @@ def editar_perfil(request):
         
     return render(request, 'core2/formulario.html', {'perfil': perfil})
 
-@login_required
+@login_required(login_url='login')
 def encuesta_datos(request):
     if request.method == 'POST':
         # 1. Obtener peso y altura enviados desde el formulario
