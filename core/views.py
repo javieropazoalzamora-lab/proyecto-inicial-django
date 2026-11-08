@@ -32,7 +32,12 @@ def iniciar_sesion(request):
         if formulario.is_valid():
             usuario = formulario.get_user()
             login(request, usuario)
-            return redirect('encuesta_datos') 
+            # --- NUEVA LÓGICA DE REDIRECCIÓN INTELIGENTE ---
+            # Verificamos si el usuario ya cuenta con un perfil registrado
+            if PerfilSansano.objects.filter(usuario=usuario).exists():
+                return redirect('portal')
+            else:
+                return redirect('encuesta_datos') 
     else:
         formulario = AuthenticationForm()
     return render(request, 'core2/login.html', {'form': formulario})
@@ -115,12 +120,13 @@ def editar_perfil(request):
         
     return render(request, 'core2/formulario.html', {'perfil': perfil})
 
-@login_required
+@login_required(login_url='login')
 def encuesta_datos(request):
     if request.method == 'POST':
-        # 1. Obtener peso y altura enviados desde el formulario
+        # 1. Obtener peso, altura y nivel de actividad física
         peso_str = request.POST.get('peso', '0').replace(',', '.')
         altura_str = request.POST.get('altura', '0').replace(',', '.')
+        actividad_fisica = request.POST.get('actividad_fisica', 'moderada') # NUEVO
         
         try:
             peso = float(peso_str)
@@ -132,7 +138,7 @@ def encuesta_datos(request):
         # Si la altura la ingresan en centímetros (ej: 175), la pasamos a metros (1.75)
         altura_m = altura / 100 if altura > 3 else altura
 
-        # 2. Calcular el IMC (IMC = peso / altura^2)
+        # 2. Calcular el IMC
         imc = round(peso / (altura_m ** 2), 2) if altura_m > 0 else 0.0
 
         # 3. Obtener el bloque seleccionado para cada día
@@ -141,27 +147,25 @@ def encuesta_datos(request):
         
         for dia in dias:
             bloque_seleccionado = request.POST.get(dia)
-            # Validamos que el bloque seleccionado esté dentro de las opciones permitidas
             if bloque_seleccionado in BLOQUES_VALIDOS:
                 bloques[dia] = bloque_seleccionado
             else:
                 bloques[dia] = 'Sin tiempo libre'
 
-        # 4. Guardar o actualizar en la base de datos
+        # 4. Guardar o actualizar en la base de datos incluyendo la actividad física
         PerfilSansano.objects.update_or_create(
             usuario=request.user,
             defaults={
                 'peso': peso,
                 'altura': altura,
-                'imc': imc,                     # Campo para almacenar el IMC
-                'bloques_libres': str(bloques)  # Guarda el diccionario como texto o JSON
+                'imc': imc,
+                'actividad_fisica': actividad_fisica, # NUEVO: Guardar en BD
+                'bloques_libres': str(bloques)
             }
         )
 
-        # 5. Redirigir a la vista del portal tras presionar "Generar"
         return redirect('portal')
 
-    # Si es petición GET, se renderiza el formulario
     return render(request, 'core2/formulario.html', {
         'bloques_horarios': BLOQUES_VALIDOS
     })
@@ -176,11 +180,12 @@ def portal(request):
     try:
         perfil = PerfilSansano.objects.get(usuario=request.user)
         imc = perfil.imc
-        # Convertir el string de bloques guardado en el modelo de vuelta a un diccionario de Python
+        actividad = getattr(perfil, 'actividad_fisica', 'moderada')
         bloques_libres = ast.literal_eval(perfil.bloques_libres) if perfil.bloques_libres else {}
     except PerfilSansano.DoesNotExist:
         perfil = None
         imc = None
+        actividad = 'moderada'
         bloques_libres = {}
 
     rutina_alimentacion = {}
@@ -188,72 +193,125 @@ def portal(request):
     tipo_imc = "Sin datos"
 
     if imc is not None:
-        # --- 1. CLASIFICACIÓN Y DIETA (Igual que antes) ---
+        # --- 1. MATRIZ DE 9 PERFILES (P1 a P9) SEGÚN PDF ---
         if imc < 18.5:
-            tipo_imc = "Bajo peso (Dieta hipercalórica saludable)"
-            rutina_alimentacion = {
-                'Lunes': {'desayuno': 'Avena con leche entera, plátano y mantequilla de maní', 'almuerzo': 'Arroz, pechuga de pollo a la plancha, palta y ensalada', 'once': 'Pan con huevo revuelto y un vaso de leche'},
-                'Martes': {'desayuno': 'Pan con palta y un huevo duro, vaso de leche', 'almuerzo': 'Puré de papas con carne vacuna y ensalada mixta', 'once': 'Yogurt con granola y frutos secos'},
-                'Miércoles': {'desayuno': 'Pancakes de avena y plátano con miel', 'almuerzo': 'Fideos con salsa boloñesa y queso rallado', 'once': 'Té con pan y queso mantecoso'},
-                'Jueves': {'desayuno': 'Batido de plátano, avena, leche y mantequilla de maní', 'almuerzo': 'Arroz con atún, huevo duro y ensalada', 'once': 'Galletas de avena con leche'},
-                'Viernes': {'desayuno': 'Tostadas con mantequilla de maní y rodajas de plátano', 'almuerzo': 'Lentejas con arroz y trozos de zapallo', 'once': 'Pan con palta y un vaso de leche'},
-                'Sábado': {'desayuno': 'Revuelto de huevos con jamón y pan tostado', 'almuerzo': 'Carne al horno con papas doradas y ensalada', 'once': 'Queque casero con té o leche'},
-                'Domingo': {'desayuno': 'Pudín de chía con leche y frutas', 'almuerzo': 'Pescado al horno con puré y ensalada', 'once': 'Pan con queso y un vaso de jugo natural'}
-            }
-        elif 18.5 <= imc < 25:
-            tipo_imc = "Peso normal (Dieta equilibrada)"
-            rutina_alimentacion = {
-                'Lunes': {'desayuno': 'Yogurt descremado con avena y fruta fresca', 'almuerzo': 'Pechuga de pollo con quinoa y ensalada verde', 'once': 'Infusión con tostadas integrales y quesillo'},
-                'Martes': {'desayuno': 'Tostada integral con palta y huevo pochado', 'almuerzo': 'Pescado al horno con papas cocidas y brócoli', 'once': 'Fruta y un puñado de almendras'},
-                'Miércoles': {'desayuno': 'Batido verde (espinaca, manzana, plátano y agua)', 'almuerzo': 'Lentejas guisadas con verduras y un huevo duro', 'once': 'Yogurt con semillas de chía'},
-                'Jueves': {'desayuno': 'Pan integral con jamón de pavo y queso fresco', 'almuerzo': 'Arroz integral con carne magra y ensalada mixta', 'once': 'Té con panqueques de avena'},
-                'Viernes': {'desayuno': 'Omelette de claras con espinaca y tomate', 'almuerzo': 'Fideos integrales con salsa de tomate natural y pavo', 'once': 'Infusión con galletas de arroz y palta'},
-                'Sábado': {'desayuno': 'Pancakes saludables de avena y plátano', 'almuerzo': 'Carne magra a la plancha con puré de zapallo y ensalada', 'once': 'Leche con pan integral y quesillo'},
-                'Domingo': {'desayuno': 'Fruta picada con yogurt natural y nueces', 'almuerzo': 'Garbanzos salteados con verduras y pollo desmenuzado', 'once': 'Infusión con tostadas y mermelada sin azúcar'}
-            }
-        elif 25 <= imc < 30:
-            tipo_imc = "Sobrepeso (Dieta de control calórico)"
-            rutina_alimentacion = {
-                'Lunes': {'desayuno': 'Infusión sin azúcar con tostada integral y quesillo light', 'almuerzo': 'Pechuga de pollo a la plancha con ensalada abundante de lechuga y tomate', 'once': 'Yogurt descremado con infusión'},
-                'Martes': {'desayuno': 'Leche descremada con frutillas', 'almuerzo': 'Merluza al horno con puré de zapallo italiano y ensalada verde', 'once': 'Infusión con pan integral y palta (porción moderada)'},
-                'Miércoles': {'desayuno': 'Yogurt descremado con avena', 'almuerzo': 'Sopa de verduras y porción pequeña de carne magra con ensalada', 'once': 'Infusión con galletas de arroz y quesillo'},
-                'Jueves': {'desayuno': 'Omelette de claras con champiñones', 'almuerzo': 'Ensalada grande de atún al agua con huevo duro y verduras', 'once': 'Té con tostada integral y huevo'},
-                'Viernes': {'desayuno': 'Infusión con pan integral y quesillo light', 'almuerzo': 'Pollo desmenuzado con mix de verduras salteadas y quinoa', 'once': 'Yogurt descremado'},
-                'Sábado': {'desayuno': 'Pudín de chía con leche descremada y frutos rojos', 'almuerzo': 'Carne magra al horno con ensalada de brócoli y coliflor', 'once': 'Infusión con tostadas integrales'},
-                'Domingo': {'desayuno': 'Huevos revueltos con tomate y té', 'almuerzo': 'Pescado al vapor con espárragos y ensalada mixta', 'once': 'Infusión con pan integral y quesillo'}
-            }
-        else:
-            tipo_imc = "Obesidad (Dieta hipocalórica supervisada)"
-            rutina_alimentacion = {
-                'Lunes': {'desayuno': 'Infusión sin azúcar con una tostada integral y un huevo revuelto', 'almuerzo': 'Pechuga de pollo a la plancha con gran cantidad de ensalada verde', 'once': 'Yogurt descremado sin azúcar'},
-                'Martes': {'desayuno': 'Leche descremada con avena y una fruta pequeña', 'almuerzo': 'Pescado blanco al horno con zapallo italiano y brócoli al vapor', 'once': 'Infusión con pan integral y quesillo descremado'},
-                'Miércoles': {'desayuno': 'Infusión con dos huevos duros', 'almuerzo': 'Ensalada verde abundante con atún al agua y media porción de legumbres', 'once': 'Yogurt descremado con semillas'},
-                'Jueves': {'desayuno': 'Batido de frutos rojos con leche descremada', 'almuerzo': 'Carne magra desgrasada con ensalada mixta de pepino y lechuga', 'once': 'Infusión con galletas de arroz'},
-                'Viernes': {'desayuno': 'Infusión sin azúcar con tostada integral y poca palta', 'almuerzo': 'Pechuga de pavo al horno con verduras al vapor (sin aceite)', 'once': 'Infusión con un huevo duro'},
-                'Sábado': {'desayuno': 'Omelette de claras con espinaca y tomate', 'almuerzo': 'Sopa clara de verduras y filete de pescado con espárragos', 'once': 'Yogurt descremado'},
-                'Domingo': {'desayuno': 'Infusión con pan integral y quesillo', 'almuerzo': 'Ensalada grande con pollo grillado y verduras cocidas', 'once': 'Infusión con tostadas integrales'}
-            }
+            if actividad == 'leve':
+                tipo_imc = "P1: Ganar peso (Actividad baja)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan con palta y huevo (2 rebanadas pan integral, palta, 1 huevo revuelto y 1 vaso de leche)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa al horno, 1 taza de arroz y ensalada con aceite de oliva)', 'Once': 'Sándwich de queso y jamón (2 panes con queso, jamón y palta. Té o leche)', 'Colación': 'Frutos secos con pasas (1 puñado de nueces/almendras con pasas)'},
+                    'Martes': {'Desayuno': 'Avena con leche y plátano (1 taza de avena en leche entera, 1 plátano y nueces)', 'Almuerzo': 'Lentejas con arroz y huevo (1 plato de lentejas, 1/2 taza de arroz y 1 huevo cocido)', 'Once': 'Yogur con fruta y frutos secos (1 yogur entero, fruta picada y frutos secos)', 'Colación': 'Batido de plátano (1 plátano licuado con leche entera y mantequilla de maní)'},
+                    'Miércoles': {'Desayuno': 'Tostadas con queso y fruta (2 tostadas con queso, 1 fruta y 1 vaso de leche)', 'Almuerzo': 'Carne con puré (1 trozo de carne guisada, 1 taza de puré y ensalada de tomate)', 'Once': 'Pan con palta y huevo (2 panes con palta y huevo cocido, 1 vaso de leche)', 'Colación': 'Yogur con avena (1 yogur entero con 1 cda. de avena)'},
+                    'Jueves': {'Desayuno': 'Yogur con granola y fruta (1 yogur entero con granola y plátano)', 'Almuerzo': 'Fideos con salsa de carne (1 plato de fideos con carne molida y verduras. Postre: 1 fruta)', 'Once': 'Sándwich de pollo (2 panes con pollo desmenuzado, palta y tomate)', 'Colación': 'Pan con mantequilla de maní (1 pan con mantequilla de maní)'},
+                    'Viernes': {'Desayuno': 'Panqueques de avena (2 panqueques de avena, huevo y plátano con miel y leche)', 'Almuerzo': 'Pescado con papas (1 filete de pescado al horno, 2 papas cocidas y ensalada)', 'Once': 'Tostadas con queso y mermelada (2 tostadas con queso fresco y mermelada + leche)', 'Colación': 'Fruta con queso (1 fruta de temporada y 1 lámina de queso)'},
+                    'Sábado': {'Desayuno': 'Huevos con pan y jugo (2 huevos revueltos, 2 panes, palta y jugo natural)', 'Almuerzo': 'Cazuela de pollo (1 plato con pollo, papa, choclo, zapallo y 1/2 taza de arroz)', 'Once': 'Panqueques con plátano (2 panqueques con plátano y miel + leche)', 'Colación': 'Galletas de avena (2 galletas de avena y 1 vaso de leche)'},
+                    'Domingo': {'Desayuno': 'Pan con mantequilla de maní (2 rebanadas con mantequilla de maní, plátano y leche)', 'Almuerzo': 'Porotos con fideos (1 plato de porotos con fideos y zapallo, ensalada y fruta)', 'Once': 'Pan con queso y huevo (2 panes con queso derretido y huevo revuelto + leche)', 'Colación': 'Plátano con yogur (1 plátano con yogur entero y miel)'}
+                }
+            elif actividad == 'moderada':
+                tipo_imc = "P2: Ganar peso (Actividad media)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan con palta y huevo (3 rebanadas pan integral, palta, 2 huevos revueltos y leche)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa de pollo, 1.5 tazas de arroz y ensalada)', 'Once': 'Sándwich de queso y jamón (2 panes con queso, jamón y palta + leche)', 'Colación': 'Frutos secos con pasas (1 puñado de nueces o almendras con pasas)'},
+                    'Martes': {'Desayuno': 'Avena con leche y plátano (1.5 tazas de avena en leche entera, plátano y nueces)', 'Almuerzo': 'Lentejas con arroz y huevo (1 plato grande de lentejas, 1/2 taza de arroz y huevo)', 'Once': 'Yogur con fruta y frutos secos (1 yogur entero, fruta picada y frutos secos)', 'Colación': 'Batido de plátano (1 plátano licuado con leche y mantequilla de maní)'},
+                    'Miércoles': {'Desayuno': 'Tostadas con queso y fruta (3 tostadas con queso, 1 fruta y 1 vaso de leche)', 'Almuerzo': 'Carne con puré (1 trozo de carne, 1.5 tazas de puré y ensalada de tomate)', 'Once': 'Pan con palta y huevo (2 panes con palta y huevo cocido + leche)', 'Colación': 'Yogur con avena (1 yogur entero con 2 cdas. de avena)'},
+                    'Jueves': {'Desayuno': 'Yogur con granola y fruta (1 yogur entero con 4 cdas. de granola y plátano)', 'Almuerzo': 'Fideos con salsa de carne (1.5 platos de fideos con carne molida y verduras + fruta)', 'Once': 'Sándwich de pollo (2 panes con pollo desmenuzado, palta y tomate)', 'Colación': 'Pan con mantequilla de maní (1 pan con mantequilla de maní)'},
+                    'Viernes': {'Desayuno': 'Panqueques de avena (3 panqueques de avena, huevo y plátano con miel + leche)', 'Almuerzo': 'Pescado con papas (1 filete de pescado al horno, 3 papas cocidas y ensalada)', 'Once': 'Tostadas con queso y mermelada (3 tostadas con queso fresco y mermelada + leche)', 'Colación': 'Fruta con queso (1 fruta y 2 láminas de queso)'},
+                    'Sábado': {'Desayuno': 'Huevos con pan y jugo (2 huevos revueltos, 3 panes, palta y jugo natural)', 'Almuerzo': 'Cazuela de pollo (1 plato grande con pollo, papa, choclo, zapallo y 1 taza de arroz)', 'Once': 'Panqueques con plátano (3 panqueques con plátano y miel + leche)', 'Colación': 'Galletas de avena (3 galletas de avena y 1 vaso de leche)'},
+                    'Domingo': {'Desayuno': 'Pan con mantequilla de maní (3 rebanadas con mantequilla de maní y plátano + leche)', 'Almuerzo': 'Porotos con fideos (1 plato grande de porotos con fideos, zapallo, ensalada y fruta)', 'Once': 'Pan con queso y huevo (2 panes con queso derretido y huevo revuelto + leche)', 'Colación': 'Plátano con yogur (1 plátano con yogur entero y miel)'}
+                }
+            else: # alta
+                tipo_imc = "P3: Ganar peso (Actividad alta)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan con palta y huevo (3 rebanadas pan integral, palta, 2 huevos revueltos y leche)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa de pollo, 2 tazas de arroz y ensalada)', 'Once': 'Sándwich de queso y jamón (3 panes con queso, jamón y palta + leche)', 'Colación': 'Frutos secos con pasas (2 puñados de nueces o almendras con pasas)'},
+                    'Martes': {'Desayuno': 'Avena con leche y plátano (2 tazas de avena en leche entera, plátano y nueces)', 'Almuerzo': 'Lentejas con arroz y huevo (1 plato grande de lentejas, 1 taza de arroz y huevo)', 'Once': 'Yogur con fruta y frutos secos (1 yogur entero, fruta y 2 puñados de frutos secos)', 'Colación': 'Batido de plátano (1 plátano con leche entera y mantequilla de maní)'},
+                    'Miércoles': {'Desayuno': 'Tostadas con queso y fruta (4 tostadas con queso, 1 fruta y 1 vaso de leche)', 'Almuerzo': 'Carne con puré (1 trozo de carne, 2 tazas de puré y ensalada de tomate)', 'Once': 'Pan con palta y huevo (3 panes con palta y huevo cocido + leche)', 'Colación': 'Yogur con avena (1 yogur entero con 3 cdas. de avena)'},
+                    'Jueves': {'Desayuno': 'Yogur con granola y fruta (1 yogur entero con 6 cdas. de granola y plátano)', 'Almuerzo': 'Fideos con salsa de carne (2 platos de fideos con carne molida, verduras + fruta)', 'Once': 'Sándwich de pollo (3 panes con pollo desmenuzado, palta y tomate)', 'Colación': 'Pan con mantequilla de maní (2 panes con mantequilla de maní)'},
+                    'Viernes': {'Desayuno': 'Panqueques de avena (4 panqueques de avena, huevo y plátano con miel + leche)', 'Almuerzo': 'Pescado con papas (1 filete de pescado al horno, 4 papas cocidas y ensalada)', 'Once': 'Tostadas con queso y mermelada (4 tostadas con queso fresco y mermelada + leche)', 'Colación': 'Fruta con queso (1 fruta de temporada y 2 láminas de queso)'},
+                    'Sábado': {'Desayuno': 'Huevos con pan y jugo (3 huevos revueltos, 3 panes, palta y jugo natural)', 'Almuerzo': 'Cazuela de pollo (1 plato grande con pollo, papa, choclo, zapallo y 1 taza de arroz)', 'Once': 'Panqueques con plátano (3 panqueques con plátano y miel + leche)', 'Colación': 'Galletas de avena (4 galletas de avena y 1 vaso de leche)'},
+                    'Domingo': {'Desayuno': 'Pan con mantequilla de maní (3 rebanadas con mantequilla de maní y plátano + leche)', 'Almuerzo': 'Porotos con fideos (1 plato grande de porotos con fideos, zapallo, ensalada y fruta)', 'Once': 'Pan con queso y huevo (3 panes con queso derretido y huevo revuelto + leche)', 'Colación': 'Plátano con yogur (1 plátano con yogur entero y miel)'}
+                }
 
-       # // --- 2. LÓGICA DE EJERCICIOS SEGÚN DISPONIBILIDAD Y IMC ---
+        elif 18.5 <= imc <= 24.9:
+            if actividad == 'leve':
+                tipo_imc = "P4: Mantener peso (Actividad baja)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con palta (1 rebanada con palta y 1 huevo, té o café)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa de pollo sin piel, 1/2 taza de arroz y ensalada)', 'Once': 'Sándwich de pavo y palta (1 pan con pavo, palta y tomate)', 'Colación': 'Fruta de temporada (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur con fruta y avena (1 yogur natural, fruta y 2 cdas. de avena)', 'Almuerzo': 'Lentejas con verduras (1 plato de lentejas con zanahoria y zapallo + ensalada)', 'Once': 'Yogur con granola (1 yogur natural con 1 cda. de granola)', 'Colación': 'Yogur natural (1 yogur natural sin azúcar con fruta)'},
+                    'Miércoles': {'Desayuno': 'Pan con queso fresco (1 pan con queso fresco y tomate + té)', 'Almuerzo': 'Pescado al horno con ensalada (1 filete de pescado, ensalada y 1 papa cocida)', 'Once': 'Pan con queso fresco (1 pan con queso fresco y tomate)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 1 cda. de hummus)'},
+                    'Jueves': {'Desayuno': 'Avena con leche (1 taza de avena en leche semidescremada, fruta y canela)', 'Almuerzo': 'Fideos con atún y verduras (1/2 plato de fideos con atún, tomate y verduras)', 'Once': 'Fruta con almendras (1 fruta y 5 almendras)', 'Colación': 'Frutos secos (1 puñado de nueces o almendras)'},
+                    'Viernes': {'Desayuno': 'Tostadas con huevo y fruta (2 rebanadas pan integral, 1 huevo y fruta)', 'Almuerzo': 'Carne magra con arroz (1 trozo de carne, 1/2 taza de arroz y verduras salteadas)', 'Once': 'Huevos revueltos con verduras (1 huevo revuelto con tomate, cebolla y pan)', 'Colación': 'Plátano (1 plátano solo)'},
+                    'Sábado': {'Desayuno': 'Pan con queso fresco y tomate (1 pan con queso fresco y tomate + fruta)', 'Almuerzo': 'Cazuela de vacuno (1 plato mediano con carne, papa, choclo y zapallo)', 'Once': 'Sándwich de atún (1 pan con atún, tomate y lechuga)', 'Colación': 'Galletas de avena (1 galleta de avena casera y té)'},
+                    'Domingo': {'Desayuno': 'Panqueques de avena (1 panqueque de avena y plátano con yogur natural)', 'Almuerzo': 'Garbanzos con arroz (1 plato de garbanzos, 1/2 taza de arroz y ensalada)', 'Once': 'Pan con huevo (1 pan con huevo revuelto y tomate + té)', 'Colación': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)'}
+                }
+            elif actividad == 'moderada':
+                tipo_imc = "P5: Mantener peso (Actividad media)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con palta (2 rebanadas pan integral con palta y 1 huevo)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa de pollo sin piel, 3/4 taza de arroz y ensalada)', 'Once': 'Sándwich de pavo y palta (1 pan con pechuga de pavo, palta y tomate)', 'Colación': 'Fruta de temporada (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur con fruta y avena (1 yogur natural, fruta y 3 cdas. de avena)', 'Almuerzo': 'Lentejas con verduras (1 plato de lentejas con verduras y ensalada)', 'Once': 'Yogur con granola (1 yogur natural con 2 cdas. de granola)', 'Colación': 'Yogur natural (1 yogur natural con fruta)'},
+                    'Miércoles': {'Desayuno': 'Tostadas con huevo y fruta (2 rebanadas pan integral, 1 huevo y fruta)', 'Almuerzo': 'Pescado al horno con ensalada (1 filete, ensalada y 1 papa cocida)', 'Once': 'Pan con queso fresco (1 pan con queso fresco y tomate)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 2 cdas. de hummus)'},
+                    'Jueves': {'Desayuno': 'Avena con leche (1 taza de avena en leche semidescremada, fruta y canela)', 'Almuerzo': 'Fideos con atún y verduras (1 plato de fideos con atún y verduras)', 'Once': 'Fruta con almendras (1 fruta y 8 almendras)', 'Colación': 'Frutos secos (1 puñado de nueces o almendras)'},
+                    'Viernes': {'Desayuno': 'Pan con queso fresco y tomate (2 panes con queso fresco, tomate y fruta)', 'Almuerzo': 'Carne magra con arroz (1 trozo de carne, 3/4 taza de arroz y verduras)', 'Once': 'Tostadas con palta (2 tostadas con palta y 1 huevo cocido)', 'Colación': 'Plátano (1 plátano solo)'},
+                    'Sábado': {'Desayuno': 'Huevos revueltos con verduras (2 huevos revueltos con tomate, cebolla y 2 panes)', 'Almuerzo': 'Cazuela de vacuno (1 plato mediano con carne, papa, choclo y zapallo)', 'Once': 'Sándwich de atún (1 pan con atún, tomate y lechuga)', 'Colación': 'Galletas de avena (2 galletas de avena caseras y té)'},
+                    'Domingo': {'Desayuno': 'Panqueques de avena (2 panqueques de avena y plátano con yogur natural)', 'Almuerzo': 'Garbanzos con arroz (1 plato de garbanzos, 1/2 taza de arroz y ensalada)', 'Once': 'Pan con huevo (1 pan con huevo revuelto y tomate)', 'Colación': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)'}
+                }
+            else: # alta
+                tipo_imc = "P6: Mantener peso (Actividad alta)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con palta (2 rebanadas pan integral con palta y 2 huevos)', 'Almuerzo': 'Pollo con arroz y ensalada (1 presa de pollo sin piel, 1 taza de arroz y ensalada)', 'Once': 'Sándwich de pavo y palta (2 panes con pavo, palta y tomate)', 'Colación': 'Fruta de temporada (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur con fruta y avena (1 yogur natural, fruta y 4 cdas. de avena)', 'Almuerzo': 'Lentejas con verduras (1 plato grande de lentejas con verduras y ensalada)', 'Once': 'Yogur con granola (1 yogur natural con 3 cdas. de granola)', 'Colación': 'Yogur natural (1 yogur natural con fruta y 1 cda. de avena)'},
+                    'Miércoles': {'Desayuno': 'Tostadas con huevo y fruta (3 rebanadas pan integral, 1 huevo y fruta)', 'Almuerzo': 'Pescado al horno con ensalada (1 filete, ensalada y 2 papas cocidas)', 'Once': 'Pan con queso fresco (2 panes con queso fresco y tomate)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 3 cdas. de hummus)'},
+                    'Jueves': {'Desayuno': 'Avena con leche (1.5 tazas de avena en leche semidescremada, fruta y canela)', 'Almuerzo': 'Fideos con atún y verduras (1.5 platos de fideos con atún y verduras)', 'Once': 'Fruta con almendras (1 fruta y 10 almendras)', 'Colación': 'Frutos secos (1 puñado de nueces o almendras)'},
+                    'Viernes': {'Desayuno': 'Pan con queso fresco y tomate (2 panes con queso fresco, tomate y fruta)', 'Almuerzo': 'Carne magra con arroz (1 trozo de carne, 1 taza de arroz y verduras)', 'Once': 'Tostadas con palta (2 tostadas con palta y 1 huevo cocido)', 'Colación': 'Plátano con mantequilla de maní (1 plátano con 1 cda. de mantequilla de maní)'},
+                    'Sábado': {'Desayuno': 'Huevos revueltos con verduras (3 huevos revueltos con tomate, cebolla y 2 panes)', 'Almuerzo': 'Cazuela de vacuno (1 plato grande con carne, papa, choclo y zapallo)', 'Once': 'Sándwich de atún (2 panes con atún, tomate y lechuga)', 'Colación': 'Galletas de avena (3 galletas de avena caseras y té)'},
+                    'Domingo': {'Desayuno': 'Panqueques de avena (3 panqueques de avena y plátano con yogur natural)', 'Almuerzo': 'Garbanzos con arroz (1 plato grande de garbanzos, 1 taza de arroz y ensalada)', 'Once': 'Pan con huevo (2 panes con huevo revuelto y tomate)', 'Colación': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)'}
+                }
+
+        else:
+            if actividad == 'leve':
+                tipo_imc = "P7: Reducir grasa corporal (Actividad baja)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con queso fresco (1 rebanada con queso fresco, tomate, 1 huevo cocido)', 'Almuerzo': 'Pollo a la plancha con ensalada (1 presa sin piel, ensalada y 1/2 taza de arroz)', 'Once': 'Pan integral con palta (1 rebanada con 2 cdas. de palta)', 'Colación': 'Fruta entera (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur natural con fruta (1 yogur sin azúcar, 1/2 taza de fruta y avena)', 'Almuerzo': 'Lentejas con verduras (1 plato mediano de lentejas con zapallo, zanahoria y ensalada)', 'Once': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)', 'Colación': 'Verduras crudas (Zanahoria, pepino o apio en palitos con limón)'},
+                    'Miércoles': {'Desayuno': 'Tostada con huevo revuelto (1 pan integral con 1 huevo revuelto y tomate)', 'Almuerzo': 'Pescado al horno con verduras (1 filete, 1 taza de verduras al vapor y 1/2 taza de quinoa)', 'Once': 'Pan integral con pavo (1 pan integral con pechuga de pavo y tomate)', 'Colación': 'Yogur natural (1 yogur natural sin azúcar)'},
+                    'Jueves': {'Desayuno': 'Avena con fruta (1/2 taza de avena en agua o leche descremada con manzana)', 'Almuerzo': 'Ensalada con pollo (Lechuga, tomate, pollo desmenuzado, 1/2 taza de garbanzos y limón)', 'Once': 'Yogur con fruta (1 yogur natural sin azúcar con fruta picada)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 1 cda. de hummus)'},
+                    'Viernes': {'Desayuno': 'Pan con palta (1 rebanada pan integral con 2 cdas. de palta y fruta)', 'Almuerzo': 'Atún con legumbres y ensalada (1/2 lata de atún, 1/2 taza de porotos/garbanzos y ensalada)', 'Once': 'Pan con queso fresco (1 rebanada con queso fresco y pepino)', 'Colación': 'Fruta con almendras (1 fruta y 3 almendras)'},
+                    'Sábado': {'Desayuno': 'Huevos con verduras (1 huevo revuelto con espinaca o tomate y pan integral)', 'Almuerzo': 'Carne magra con verduras (1 trozo pequeño de carne, verduras y 1 papa cocida)', 'Once': 'Tostada con atún (1 tostada integral con atún y tomate)', 'Colación': 'Huevo cocido (1 huevo cocido con tomate)'},
+                    'Domingo': {'Desayuno': 'Yogur con avena y plátano (1 yogur natural con avena y 1/2 plátano)', 'Almuerzo': 'Sopa de verduras con pollo (1 plato de sopa con pollo, zapallo, zanahoria y choclo + ensalada)', 'Once': 'Fruta con almendras (1 fruta y 3 almendras)', 'Colación': 'Fruta picada con canela (1 taza de fruta picada con canela)'}
+                }
+            elif actividad == 'moderada':
+                tipo_imc = "P8: Reducir grasa corporal (Actividad media)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con queso fresco (1 rebanada con queso fresco, tomate, 1 huevo cocido)', 'Almuerzo': 'Pollo a la plancha con ensalada (1 presa sin piel, ensalada y 1/2 taza de arroz)', 'Once': 'Pan integral con palta (1 rebanada con 2 cdas. de palta)', 'Colación': 'Fruta entera (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur natural con fruta (1 yogur sin azúcar, fruta y 2 cdas. de avena)', 'Almuerzo': 'Lentejas con verduras (1 plato mediano de lentejas con zapallo y ensalada)', 'Once': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)', 'Colación': 'Verduras crudas (Zanahoria, pepino o apio en palitos con limón)'},
+                    'Miércoles': {'Desayuno': 'Tostada con huevo revuelto (2 rebanadas pan integral con 1 huevo revuelto y tomate)', 'Almuerzo': 'Pescado al horno con verduras (1 filete, 1.5 tazas de verduras al vapor y 1/2 taza de quinoa)', 'Once': 'Pan integral con pavo (1 pan integral con pechuga de pavo y tomate)', 'Colación': 'Yogur natural (1 yogur natural sin azúcar)'},
+                    'Jueves': {'Desayuno': 'Avena con fruta (1/2 taza de avena en agua o leche descremada con manzana)', 'Almuerzo': 'Ensalada con pollo (Lechuga, tomate, pollo desmenuzado, 1/2 taza de garbanzos y limón)', 'Once': 'Yogur con fruta (1 yogur natural sin azúcar con fruta picada)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 2 cdas. de hummus)'},
+                    'Viernes': {'Desayuno': 'Pan con palta (1 rebanada pan integral con 2 cdas. de palta y fruta)', 'Almuerzo': 'Atún con legumbres y ensalada (1 lata de atún, 1/2 taza de porotos/garbanzos y ensalada)', 'Once': 'Pan con queso fresco (1 rebanada con queso fresco y pepino)', 'Colación': 'Fruta con almendras (1 fruta y 5 almendras)'},
+                    'Sábado': {'Desayuno': 'Huevos con verduras (2 huevos revueltos con espinaca o tomate y pan integral)', 'Almuerzo': 'Carne magra con verduras (1 trozo pequeño de carne, verduras y 1 papa cocida)', 'Once': 'Tostada con atún (1 tostada integral con atún y tomate)', 'Colación': 'Huevo cocido (1 huevo cocido con tomate)'},
+                    'Domingo': {'Desayuno': 'Yogur con avena y plátano (1 yogur natural con 3 cdas. de avena y 1/2 plátano)', 'Almuerzo': 'Sopa de verduras con pollo (1 plato de sopa con pollo, zapallo, zanahoria y choclo + ensalada)', 'Once': 'Fruta con almendras (1 fruta y 5 almendras)', 'Colación': 'Fruta picada con canela (1 taza de fruta picada con canela)'}
+                }
+            else: # alta
+                tipo_imc = "P9: Reducir grasa corporal (Actividad alta)"
+                rutina_alimentacion = {
+                    'Lunes': {'Desayuno': 'Pan integral con queso fresco (2 rebanadas con queso fresco, tomate, 1 huevo cocido)', 'Almuerzo': 'Pollo a la plancha con ensalada (1 presa sin piel, ensalada y 3/4 taza de arroz)', 'Once': 'Pan integral con palta (2 rebanadas con 2 cdas. de palta)', 'Colación': 'Fruta entera (1 manzana, pera o naranja)'},
+                    'Martes': {'Desayuno': 'Yogur natural con fruta (1 yogur sin azúcar, fruta y 3 cdas. de avena)', 'Almuerzo': 'Lentejas con verduras (1 plato de lentejas con zapallo, zanahoria y ensalada)', 'Once': 'Huevo cocido y fruta (1 huevo cocido y 1 fruta)', 'Colación': 'Verduras crudas (Zanahoria, pepino o apio en palitos con limón)'},
+                    'Miércoles': {'Desayuno': 'Tostada con huevo revuelto (2 rebanadas pan integral con 2 huevos revueltos y tomate)', 'Almuerzo': 'Pescado al horno con verduras (1 filete, 2 tazas de verduras al vapor y 1/2 taza de quinoa)', 'Once': 'Pan integral con pavo (2 panes integrales con pechuga de pavo y tomate)', 'Colación': 'Yogur natural / Zanahoria con hummus (1 yogur natural sin azúcar / Palitos con hummus)'},
+                    'Jueves': {'Desayuno': 'Avena con fruta (1 taza de avena en agua o leche descremada con manzana)', 'Almuerzo': 'Ensalada con pollo (Lechuga, tomate, pollo desmenuzado, 1/2 taza de garbanzos y limón)', 'Once': 'Yogur con fruta (1 yogur natural sin azúcar con fruta picada)', 'Colación': 'Zanahoria con hummus (Palitos de zanahoria con 2 cdas. de hummus)'},
+                    'Viernes': {'Desayuno': 'Pan con palta (2 rebanadas pan integral con 2 cdas. de palta y fruta)', 'Almuerzo': 'Atún con legumbres y ensalada (1 lata de atún, 1 taza de porotos/garbanzos y ensalada)', 'Once': 'Pan con queso fresco (2 rebanadas con queso fresco y pepino)', 'Colación': 'Fruta con almendras (1 fruta y 5 almendras)'},
+                    'Sábado': {'Desayuno': 'Huevos con verduras (2 huevos revueltos con espinaca o tomate y 2 panes integrales)', 'Almuerzo': 'Carne magra con verduras (1 trozo de carne, verduras y 2 papas cocidas)', 'Once': 'Tostada con atún (2 tostadas integrales con atún y tomate)', 'Colación': 'Huevo cocido (1 huevo cocido con tomate)'},
+                    'Domingo': {'Desayuno': 'Yogur con avena y plátano (1 yogur natural con 4 cdas. de avena y 1/2 plátano)', 'Almuerzo': 'Sopa de verduras con pollo (1 plato grande de sopa con pollo, verduras y choclo + ensalada)', 'Once': 'Fruta con almendras (1 fruta y 8 almendras)', 'Colación': 'Fruta picada con canela (1.5 tazas de fruta picada con canela)'}
+                }
+
+        # --- 2. LÓGICA DE EJERCICIOS ---
         dias_semana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
-        
         for dia in dias_semana:
-            # Obtenemos el bloque que eligió para ese día (ej. '8:15-9:25' o 'Sin tiempo libre')
             bloque_dia = bloques_libres.get(dia, 'Sin tiempo libre')
-            
-            # Si el usuario marcó 'Sin tiempo libre', se respeta como día de descanso
             if bloque_dia == 'Sin tiempo libre':
                 rutina_ejercicios[dia.capitalize()] = "Día libre / Descanso (Sin bloques disponibles)"
             else:
-                # Si tiene tiempo libre, adaptamos el ejercicio según su IMC
                 if imc < 18.5:
-                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Rutina de fuerza moderada (ganancia muscular) + descanso intermedio."
-                elif 18.5 <= imc < 25:
-                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Combinado: 30 min de cardio + ejercicios de tonificación."
-                elif 25 <= imc < 30:
-                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Quema grasa: Cardio sostenido (trote suave / caminata rápida) en el bloque libre."
+                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Rutina de fuerza moderada (ganancia muscular)."
+                elif 18.5 <= imc <= 24.9:
+                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Combinado: 30 min de cardio + tonificación."
                 else:
-                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Bajo impacto: Caminata activa o elíptica durante el bloque disponible."
+                    rutina_ejercicios[dia.capitalize()] = f"Bloque {bloque_dia}: Quema grasa / Cardio sostenido en el bloque libre."
 
     return render(request, 'core2/portal.html', {
         'perfil': perfil,
