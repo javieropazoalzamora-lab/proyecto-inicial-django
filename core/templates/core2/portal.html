@@ -148,6 +148,15 @@
             <p style="margin-top: 15px; font-size: 0.95em;">
                 <strong>Estado:</strong> <span style="color: #27ae60;">{{ tipo_imc }}</span>
             </p>
+            {% if perfil.tiempo_transporte_min is not None %}
+            <p style="font-size: 0.95em;"><strong>Transporte:</strong> {{ perfil.tiempo_transporte_min }} min por trayecto</p>
+            {% endif %}
+            {% if alerta_profesional %}
+            <p style="background:#fff3cd; color:#664d03; border:1px solid #ffecb5; padding:10px 14px; border-radius:8px; font-size:0.95em;">
+                ⚠️ {{ alerta_profesional }}
+            </p>
+            {% endif %}
+            <p style="font-size:0.85em; color:#777;">{{ aviso_salud }}</p>
         </div>
 
         <!-- Rutina Semanal por Días -->
@@ -176,17 +185,7 @@
             {% endfor %}
         </div>
 
-    {% else %}
-        <!-- Estado sin datos previos -->
-        <div class="card-perfil" style="text-align: center;">
-            <h2>Aún no has ingresado tus datos</h2>
-            <p>Para generar una rutina de alimentación personalizada, por favor completa primero el formulario de salud.</p>
-            <a href="{% url 'encuesta_datos' %}" class="btn-encuesta">Ir a la Encuesta</a>
-        </div>
-    {% endif %}
-
-</div>
-<!-- Rutina de Ejercicios Adaptada a Horarios e IMC -->
+        <!-- Rutina de Ejercicios Adaptada a Horarios e IMC -->
         <h3 class="titulo-rutina" style="margin-top: 30px;">Plan de Actividad Física y Bloques Horarios</h3>
         
         <div class="rutina-grid">
@@ -200,5 +199,18 @@
                 </div>
             {% endfor %}
         </div>
+
+        <p style="margin-top:20px;"><a href="{% url 'encuesta_datos' %}" class="btn-encuesta">Editar mis datos</a></p>
+
+    {% else %}
+        <!-- Estado sin datos previos -->
+        <div class="card-perfil" style="text-align: center;">
+            <h2>Aún no has ingresado tus datos</h2>
+            <p>Para generar una rutina de alimentación personalizada, por favor completa primero el formulario de salud.</p>
+            <a href="{% url 'encuesta_datos' %}" class="btn-encuesta">Ir a la Encuesta</a>
+        </div>
+    {% endif %}
+
+</div>
 </body>
 </html>

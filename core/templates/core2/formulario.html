@@ -88,6 +88,18 @@
       grid-column: span 1;
     }
   }
+  .alert-error ul { margin: 0; padding-left: 18px; font-weight: 500; }
+
+  .bloques-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bloque-op {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--ri); padding: 6px 10px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .bloque-op input { width: auto; margin: 0; }
+  .bloque-op:has(input:checked) { border-color: var(--accent); }
+  .hint { color: var(--mute); font-size: 12px; font-weight: 400; }
 </style>
 {% endblock %}
 
@@ -99,110 +111,54 @@
       Ingresa tu información corporal y selecciona tus bloques libres para generar tu plan.
     </p>
 
-    <!-- Alertas de error enviadas desde Django -->
-    {% if error %}
+    {% if form.errors %}
       <div class="alert-error">
-        {{ error }}
+        <ul>
+          {% for campo, errores in form.errors.items %}
+            {% for e in errores %}<li>{{ e }}</li>{% endfor %}
+          {% endfor %}
+        </ul>
       </div>
     {% endif %}
 
     <form method="POST" class="fm-grid">
       {% csrf_token %}
 
-      <!-- Sección 1: Datos Físicos -->
       <div class="fm-full form-section-title">1. Información Corporal</div>
 
       <div class="form-group">
         <label for="peso">Peso (kg):</label>
-        <input type="number" step="0.1" min="0.1" name="peso" id="peso" value="{{ peso_val|default:'' }}" placeholder="Ej: 70.5" required>
+        <input type="text" inputmode="decimal" name="peso" id="peso" value="{{ peso_val }}" placeholder="Ej: 70.5" required>
       </div>
 
       <div class="form-group">
         <label for="altura">Altura (cm o m):</label>
-        <input type="number" step="0.01" min="0.1" name="altura" id="altura" value="{{ altura_val|default:'' }}" placeholder="Ej: 175 o 1.75" required>
+        <input type="text" inputmode="decimal" name="altura" id="altura" value="{{ altura_val }}" placeholder="Ej: 175 o 1.75" required>
       </div>
 
-      <!-- Sección 2: Horarios Libres -->
-      <div class="fm-full form-section-title">2. Bloques Libres por Día</div>
+      <div class="fm-full form-section-title">2. Transporte</div>
 
-      <!-- LUNES -->
-      <div class="form-group">
-        <label for="lunes">Lunes:</label>
-        <select name="lunes" id="lunes">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- MARTES -->
-      <div class="form-group">
-        <label for="martes">Martes:</label>
-        <select name="martes" id="martes">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- MIÉRCOLES -->
-      <div class="form-group">
-        <label for="miercoles">Miércoles:</label>
-        <select name="miercoles" id="miercoles">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- JUEVES -->
-      <div class="form-group">
-        <label for="jueves">Jueves:</label>
-        <select name="jueves" id="jueves">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- VIERNES -->
-      <div class="form-group">
-        <label for="viernes">Viernes:</label>
-        <select name="viernes" id="viernes">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- SÁBADO -->
-      <div class="form-group">
-        <label for="sabado">Sábado:</label>
-        <select name="sabado" id="sabado">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- DOMINGO -->
       <div class="form-group fm-full">
-        <label for="domingo">Domingo:</label>
-        <select name="domingo" id="domingo">
-          <option value="Sin tiempo libre">Sin tiempo libre</option>
-          {% for bloque in bloques_horarios %}
-            <option value="{{ bloque }}">{{ bloque }}</option>
-          {% endfor %}
-        </select>
+        <label for="tiempo_transporte_min">Tiempo de transporte por trayecto (minutos): <span class="hint">opcional</span></label>
+        <input type="number" min="0" max="240" step="1" name="tiempo_transporte_min" id="tiempo_transporte_min" value="{{ transporte_val }}" placeholder="Ej: 40">
       </div>
 
-      <!-- Botón de Envío -->
+      <div class="fm-full form-section-title">3. Bloques Libres por Día <span class="hint">(puedes marcar varios)</span></div>
+
+      {% for dia in dias_ui %}
+      <div class="form-group fm-full">
+        <label>{{ dia.etiqueta }}:</label>
+        <div class="bloques-grid">
+          {% for b in dia.bloques %}
+            <label class="bloque-op">
+              <input type="checkbox" name="{{ dia.clave }}" value="{{ b.valor }}" {% if b.marcado %}checked{% endif %}>
+              {{ b.valor }}
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+
       <div class="fm-full" style="margin-top: 12px;">
         <button type="submit" class="btn" style="width: 100%;">Generar</button>
       </div>
