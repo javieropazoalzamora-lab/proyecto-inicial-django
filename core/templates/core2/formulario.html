@@ -159,6 +159,71 @@
       </div>
       {% endfor %}
 
+      <div class="fm-full form-section-title">4. Tus objetivos y alimentación</div>
+
+      <div class="form-group">
+        <label for="objetivo">Objetivo principal:</label>
+        <select name="objetivo" id="objetivo">
+          {% for o in opc_objetivo %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group fm-full">
+        <label for="actividad_fisica">Nivel de actividad física actual:</label>
+        <select name="actividad_fisica" id="actividad_fisica">
+          {% for o in opc_actividad %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="tipo_dieta">Tipo de dieta:</label>
+        <select name="tipo_dieta" id="tipo_dieta">
+          {% for o in opc_dieta %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group fm-full">
+        <label for="alergias">Alergias o intolerancias: <span class="hint">opcional, texto corto (ej: lactosa, maní)</span></label>
+        <input type="text" name="alergias" id="alergias" maxlength="100" value="{{ alergias_val }}">
+      </div>
+
+      <div class="form-group">
+        <label for="presupuesto">Presupuesto de comida:</label>
+        <select name="presupuesto" id="presupuesto">
+          {% for o in opc_presupuesto %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="tiempo_cocina">Tiempo para cocinar:</label>
+        <select name="tiempo_cocina" id="tiempo_cocina">
+          {% for o in opc_cocina %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="lugar_entrenamiento">Dónde entrenas:</label>
+        <select name="lugar_entrenamiento" id="lugar_entrenamiento">
+          {% for o in opc_lugar %}<option value="{{ o.valor }}" {% if o.marcado %}selected{% endif %}>{{ o.etiqueta }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="bloque-op" style="margin-top: 24px;">
+          <input type="checkbox" name="tiene_lesion" {% if lesion_val %}checked{% endif %}>
+          Tengo una molestia o lesión que limita ciertos ejercicios
+        </label>
+      </div>
+
+      <div class="fm-full form-section-title">5. Confirmación</div>
+      <div class="form-group fm-full">
+        <label class="bloque-op">
+          <input type="checkbox" name="mayor_de_edad" {% if mayor_val %}checked{% endif %} required>
+          Confirmo que tengo 18 años o más
+        </label>
+        <p class="hint">Tus datos de salud y alimentación se usan para armar tu plan y pueden enviarse, sin tu nombre ni correo, a un servicio de inteligencia artificial (Google Gemini). Las sugerencias son orientativas y no reemplazan a un profesional de la salud.</p>
+      </div>
+
       <div class="fm-full" style="margin-top: 12px;">
         <button type="submit" class="btn" style="width: 100%;">Generar</button>
       </div>

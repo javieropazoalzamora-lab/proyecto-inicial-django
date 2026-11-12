@@ -1,10 +1,12 @@
 import math
+import re
 
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
-from .constantes import BLOQUES_VALIDOS, DIAS
+from .constantes import (ACTIVIDADES, BLOQUES_VALIDOS, DIAS, DIETAS, LUGARES, OBJETIVOS,
+                         PRESUPUESTOS, TIEMPOS_COCINA)
 
 DOMINIO_PERMITIDO = '@usm.cl'
 
@@ -42,6 +44,21 @@ class EncuestaPerfilForm(forms.Form):
     peso = forms.CharField()
     altura = forms.CharField()
     tiempo_transporte_min = forms.IntegerField(required=False, min_value=0, max_value=240)
+    mayor_de_edad = forms.BooleanField(
+        required=True, error_messages={'required': "Debes confirmar que tienes 18 años o más."})
+    actividad_fisica = forms.ChoiceField(choices=ACTIVIDADES)
+    objetivo = forms.ChoiceField(choices=OBJETIVOS)
+    tipo_dieta = forms.ChoiceField(choices=DIETAS)
+    alergias = forms.CharField(required=False, max_length=100)
+    presupuesto = forms.ChoiceField(choices=PRESUPUESTOS)
+    tiempo_cocina = forms.ChoiceField(choices=TIEMPOS_COCINA)
+    lugar_entrenamiento = forms.ChoiceField(choices=LUGARES)
+    tiene_lesion = forms.BooleanField(required=False)
+
+    def clean_alergias(self):
+        # Texto corto que irá a la IA: solo letras, números y puntuación simple (reduce inyección de instrucciones)
+        texto = re.sub(r'[^\w\s,.\-áéíóúñÁÉÍÓÚÑ]', ' ', self.cleaned_data.get('alergias') or '')
+        return re.sub(r'\s+', ' ', texto).strip()[:100]
 
     def clean_peso(self):
         peso = _a_numero(self.cleaned_data['peso'], 'el peso')

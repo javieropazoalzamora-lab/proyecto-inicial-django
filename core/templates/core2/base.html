@@ -1,151 +1,237 @@
 {% load static %}
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="verde">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}VitaSansano{% endblock %}</title>
-  
-  <!-- Fuente Figtree -->
+
+  <!-- Aplica el tema guardado antes de pintar (evita parpadeo) -->
+  <script>
+    try {
+      var t = localStorage.getItem('vs-tema');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    :root {
-      --bg: #F3F7F3;
-      --surface: #fff;
-      --ink: #1D2B24;
-      --mute: #5F7168;
-      --accent: #2F7D55;
-      --ac: #fff;
-      --soft: #DDEEE3;
-      --line: #D5E3DA;
-      --error: #D9534F;
-      --head: 'Figtree', system-ui, sans-serif;
-      --rc: 16px;
-      --ri: 10px;
-      --rb: 999px;
+
+    /* ---------- PALETAS (cada tema solo redefine variables) ---------- */
+    :root, :root[data-theme="verde"] {
+      --bg: #F3F7F3; --surface: #fff; --ink: #1D2B24; --mute: #5F7168;
+      --accent: #2F7D55; --ac: #fff; --soft: #DDEEE3; --line: #D5E3DA;
+      --error: #D9534F; --warn-bg: #fff3cd; --warn-ink: #664d03; --sw: #2F7D55;
     }
-    
+    :root[data-theme="oceano"] {
+      --bg: #F1F6FA; --surface: #fff; --ink: #14283A; --mute: #587084;
+      --accent: #1F6FB2; --ac: #fff; --soft: #DCEBF7; --line: #D0DEEA;
+      --error: #D9534F; --warn-bg: #fff3cd; --warn-ink: #664d03; --sw: #1F6FB2;
+    }
+    :root[data-theme="atardecer"] {
+      --bg: #FBF5F0; --surface: #fff; --ink: #2E1F1A; --mute: #7A6258;
+      --accent: #D2622A; --ac: #fff; --soft: #FBE4D6; --line: #EBD8CB;
+      --error: #C0392B; --warn-bg: #fff3cd; --warn-ink: #664d03; --sw: #D2622A;
+    }
+    :root[data-theme="oscuro"] {
+      --bg: #12171A; --surface: #1B2226; --ink: #E7EEEA; --mute: #98A7A0;
+      --accent: #4CC38A; --ac: #0E1A14; --soft: #24332C; --line: #2B3A34;
+      --error: #FF7B72; --warn-bg: #3a3118; --warn-ink: #f2d98a; --sw: #4CC38A;
+    }
+
+    :root { --head: 'Figtree', system-ui, sans-serif; --rc: 16px; --ri: 10px; --rb: 999px; --side: 252px; }
+
     body {
-      background: var(--bg);
-      color: var(--ink);
-      font-family: var(--head);
-      font-size: 15px;
-      line-height: 1.5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: var(--bg); color: var(--ink); font-family: var(--head);
+      font-size: 15px; line-height: 1.5; min-height: 100vh;
     }
-    
     a { text-decoration: none; color: inherit; }
     button, select, input { font: inherit; color: inherit; }
 
-    /* BARRA SUPERIOR (Alineada de borde a borde) */
-    .nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      padding: 16px 40px;
-      border-bottom: 1px solid var(--line);
-      background: var(--surface);
-    }
-
-    .brand {
-      font: 700 20px var(--head);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: var(--ink);
-    }
-
-    .brand i {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--accent);
-      display: inline-block;
-    }
-
-    .nav nav {
-      display: flex;
-      gap: 8px;
-    }
-
-    .nav nav a {
-      color: var(--mute);
-      padding: 8px 16px;
-      border-radius: var(--rb);
-      font-weight: 500;
-      transition: 0.2s;
-    }
-
-    .nav nav a:hover, .nav nav a.on {
-      background: var(--soft);
-      color: var(--ink);
-      font-weight: 600;
-    }
-
-    /* CONTENEDOR PRINCIPAL (Centra las tarjetas) */
-    main {
-      width: 100%;
-      max-width: 1000px;
-      margin: 40px auto;
-      padding: 0 20px;
-      display: flex;
-      justify-content: center;
-      flex: 1;
-    }
-
+    /* ---------- COMPONENTES COMUNES ---------- */
     .btn {
-      background: var(--accent);
-      color: var(--ac);
-      border: 0;
-      border-radius: var(--rb);
-      padding: 13px 26px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-block;
-      text-align: center;
-      transition: 0.2s;
+      background: var(--accent); color: var(--ac); border: 0; border-radius: var(--rb);
+      padding: 13px 26px; font-weight: 600; cursor: pointer; display: inline-block;
+      text-align: center; transition: 0.2s;
     }
-
+    .btn:hover { filter: brightness(1.08); }
+    .btn.ghost { background: var(--soft); color: var(--ink); }
     .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--rc);
-      padding: 24px;
-      width: 100%;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--rc); padding: 24px; width: 100%;
+    }
+    .brand { font: 700 20px var(--head); display: flex; align-items: center; gap: 10px; color: var(--ink); }
+    .brand i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+    /* Selector de paleta */
+    .temas { display: flex; gap: 8px; align-items: center; }
+    .tema-btn {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line);
+      cursor: pointer; padding: 0; background: var(--c);
+    }
+    .tema-btn[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+    /* ---------- LAYOUT SIN SESIÓN: barra superior ---------- */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding: 14px 32px; background: var(--surface); border-bottom: 1px solid var(--line);
+    }
+    .topbar nav { display: flex; gap: 8px; align-items: center; }
+    .topbar nav a { color: var(--mute); padding: 8px 16px; border-radius: var(--rb); font-weight: 500; }
+    .topbar nav a:hover, .topbar nav a.on { background: var(--soft); color: var(--ink); font-weight: 600; }
+
+    /* ---------- LAYOUT CON SESIÓN: barra lateral ---------- */
+    .app { display: grid; grid-template-columns: var(--side) 1fr; min-height: 100vh; }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 22px;
+      padding: 22px 16px; background: var(--surface); border-right: 1px solid var(--line);
+    }
+    .side-nav { display: flex; flex-direction: column; gap: 4px; }
+    .side-nav a {
+      display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border-radius: var(--ri); color: var(--mute); font-weight: 500; transition: 0.15s;
+    }
+    .side-nav a svg { width: 18px; height: 18px; flex: none; }
+    .side-nav a:hover { background: var(--soft); color: var(--ink); }
+    .side-nav a.on { background: var(--soft); color: var(--ink); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+    .side-sep { height: 1px; background: var(--line); margin: 6px 8px; }
+
+    .perfil-box {
+      margin-top: auto; display: flex; flex-direction: column; gap: 12px;
+      padding: 14px; border: 1px solid var(--line); border-radius: var(--rc); background: var(--bg);
+    }
+    .perfil-top { display: flex; align-items: center; gap: 10px; }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--ac);
+      display: grid; place-items: center; font-weight: 700; flex: none; text-transform: uppercase;
+    }
+    .perfil-top b { display: block; font-size: 14px; line-height: 1.2; overflow-wrap: anywhere; }
+    .perfil-top small { color: var(--mute); font-size: 12px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 12px; background: var(--soft); border-radius: var(--rb); padding: 3px 10px; font-weight: 600; }
+    .perfil-box .temas-label { font-size: 12px; color: var(--mute); margin-bottom: 6px; }
+
+    main {
+      width: 100%; padding: 36px 32px; display: flex; justify-content: center; align-items: flex-start;
+      min-width: 0;
+    }
+    .app main { max-width: 1240px; margin: 0 auto; }
+    .anon main { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+
+    @media (max-width: 860px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+        gap: 10px; padding: 12px 14px; border-right: 0; border-bottom: 1px solid var(--line);
+      }
+      .side-nav { flex-direction: row; flex-wrap: wrap; flex: 1; }
+      .side-nav a { padding: 8px 12px; }
+      .side-nav a span { display: none; }
+      .side-sep { display: none; }
+      .perfil-box { margin-top: 0; flex-direction: row; align-items: center; padding: 8px 12px; }
+      .perfil-box .chips, .perfil-box .temas-label, .perfil-top small { display: none; }
+      main { padding: 20px 14px; }
+      .topbar { padding: 12px 16px; }
     }
   </style>
-  
+
   {% block extra_head %}{% endblock %}
 </head>
 <body>
 
-  <!-- Cabecera global -->
-  <header class="nav">
-    <a href="{% url 'inicio' %}" class="brand"><i></i>VitaSansano</a>
-    <nav>
-      <a href="{% url 'inicio' %}" class="{% if request.resolver_match.url_name == 'inicio' %}on{% endif %}">Inicio</a>
-      <a href="{% url 'encuesta_datos' %}" class="{% if request.resolver_match.url_name == 'encuesta_datos' %}on{% endif %}">Mis datos</a>
-      <a href="#" class="{% if request.resolver_match.url_name == 'horarios' %}on{% endif %}">Mi plan</a>
-      <a href="{% url 'portal' %}" class="{% if request.resolver_match.url_name == 'portal' %}on{% endif %}">Portal</a>
-      <a href="{% url 'login' %}" class="{% if request.resolver_match.url_name == 'login' %}on{% endif %}">Entrar</a>
+<div class="{% if user.is_authenticated %}app{% else %}anon{% endif %}">
+{% if user.is_authenticated %}
+  <aside class="sidebar">
+    <a href="{% url 'portal' %}" class="brand"><i></i>VitaSansano</a>
+
+    {% with u=request.resolver_match.url_name %}
+    <nav class="side-nav" aria-label="Principal">
+      <a href="{% url 'portal' %}" class="{% if u == 'portal' %}on{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+        <span>Mi plan semanal</span>
+      </a>
+      <a href="{% url 'encuesta_datos' %}" class="{% if u == 'encuesta_datos' or u == 'editar_perfil' %}on{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+        <span>Mis datos</span>
+      </a>
+      <div class="side-sep"></div>
+      <a href="{% url 'cambiar_clave' %}" class="{% if u == 'cambiar_clave' %}on{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        <span>Cambiar clave</span>
+      </a>
+      <a href="{% url 'logout' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        <span>Salir</span>
+      </a>
     </nav>
-  </header>
+    {% endwith %}
 
-  <!-- Contenido principal -->
+    <div class="perfil-box">
+      <div class="perfil-top">
+        <div class="avatar">{{ user.username|slice:":1" }}</div>
+        <div><b>{{ user.username }}</b><small>Mi perfil</small></div>
+      </div>
+      {% if user.perfilsansano %}
+      <div class="chips">
+        <span class="chip">{{ user.perfilsansano.peso }} kg</span>
+        <span class="chip">IMC {{ user.perfilsansano.imc }}</span>
+      </div>
+      {% endif %}
+      <div>
+        <div class="temas-label">Paleta de colores</div>
+        <div class="temas" role="group" aria-label="Paleta de colores">
+          <button type="button" class="tema-btn" data-tema="verde" style="--c:#2F7D55" title="Verde" aria-label="Verde"></button>
+          <button type="button" class="tema-btn" data-tema="oceano" style="--c:#1F6FB2" title="Océano" aria-label="Océano"></button>
+          <button type="button" class="tema-btn" data-tema="atardecer" style="--c:#D2622A" title="Atardecer" aria-label="Atardecer"></button>
+          <button type="button" class="tema-btn" data-tema="oscuro" style="--c:#1B2226" title="Oscuro" aria-label="Oscuro"></button>
+        </div>
+      </div>
+    </div>
+  </aside>
+{% else %}
+<header class="topbar">
+  <a href="{% url 'inicio' %}" class="brand"><i></i>VitaSansano</a>
+  <nav>
+    <a href="{% url 'registro' %}" class="{% if request.resolver_match.url_name == 'registro' %}on{% endif %}">Registro</a>
+    <a href="{% url 'login' %}" class="{% if request.resolver_match.url_name == 'login' %}on{% endif %}">Entrar</a>
+    <div class="temas" role="group" aria-label="Paleta de colores" style="margin-left:8px">
+      <button type="button" class="tema-btn" data-tema="verde" style="--c:#2F7D55" title="Verde" aria-label="Verde"></button>
+      <button type="button" class="tema-btn" data-tema="oceano" style="--c:#1F6FB2" title="Océano" aria-label="Océano"></button>
+      <button type="button" class="tema-btn" data-tema="atardecer" style="--c:#D2622A" title="Atardecer" aria-label="Atardecer"></button>
+      <button type="button" class="tema-btn" data-tema="oscuro" style="--c:#1B2226" title="Oscuro" aria-label="Oscuro"></button>
+    </div>
+  </nav>
+</header>
+{% endif %}
+
   <main>
-    {% block content %}
-    {% endblock %}
+    {% block content %}{% endblock %}
   </main>
+</div>
 
-  {% block extra_js %}{% endblock %}
+<script>
+  (function () {
+    var root = document.documentElement;
+    function marcar() {
+      var actual = root.getAttribute('data-theme') || 'verde';
+      document.querySelectorAll('.tema-btn').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.dataset.tema === actual ? 'true' : 'false');
+      });
+    }
+    document.querySelectorAll('.tema-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        root.setAttribute('data-theme', b.dataset.tema);
+        try { localStorage.setItem('vs-tema', b.dataset.tema); } catch (e) {}
+        marcar();
+      });
+    });
+    marcar();
+  })();
+</script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

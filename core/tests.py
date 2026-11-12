@@ -1,6 +1,14 @@
+import json
+import os
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+
+from . import ia, servicios
+from .constantes import DIAS
+from .models import PlanSemanal
 
 from .forms import RegistroSansanoForm
 from .models import PerfilSansano
@@ -25,12 +33,23 @@ class PlanesBaseTests(TestCase):
                          (25, 'sobrepeso'), (30, 'obesidad')]:
             self.assertEqual(planes_base.clasificar_imc(imc), cat)
 
-    def test_dietas_completas(self):
-        self.assertEqual(set(planes_base.PLAN_ALIMENTACION), {'bajo', 'normal', 'sobrepeso', 'obesidad'})
-        for d in planes_base.PLAN_ALIMENTACION.values():
-            self.assertEqual(len(d), 7)
-            for comidas in d.values():
-                self.assertEqual(set(comidas), {'desayuno', 'almuerzo', 'once'})
+    def test_nueve_perfiles_completos(self):
+        self.assertEqual(set(planes_base.PERFILES), {f'P{i}' for i in range(1, 10)})
+        combos = set()
+        for pf in planes_base.PERFILES.values():
+            combos.add((pf['meta'], pf['actividad']))
+            self.assertEqual(len(pf['dias']), 7)
+            for comidas in pf['dias'].values():
+                self.assertEqual(set(comidas), {'desayuno', 'almuerzo', 'once', 'colacion'})
+                self.assertTrue(all(comidas.values()))
+        self.assertEqual(len(combos), 9)
+
+    def test_perfil_segun_imc_y_actividad(self):
+        casos = [(17, 'leve', 'P1'), (18.49, 'alta', 'P3'), (18.5, 'leve', 'P4'),
+                 (24.95, 'moderada', 'P5'), (25, 'moderada', 'P8'), (31, 'alta', 'P9'),
+                 (22, 'rara', 'P5')]
+        for imc, act, cod in casos:
+            self.assertEqual(planes_base.perfil_alimentacion(imc, act)[0], cod, (imc, act))
 
     def test_alerta(self):
         self.assertIsNotNone(planes_base.alerta_profesional(15.5))
@@ -43,14 +62,31 @@ class PlanesBaseTests(TestCase):
         self.assertEqual(e['Martes'], planes_base.SIN_TIEMPO)
 
 
-class EncuestaTests(TestCase):
+BASE = {
+    'mayor_de_edad': 'on', 'actividad_fisica': 'moderada', 'objetivo': 'mantener', 'tipo_dieta': 'omnivora', 'alergias': '',
+    'presupuesto': 'medio', 'tiempo_cocina': 'normal', 'lugar_entrenamiento': 'casa',
+}
+
+
+class SinClaveMixin:
+    """Los tests nunca llaman a la API real."""
     def setUp(self):
+        super().setUp()
+        p = mock.patch.dict(os.environ, {}, clear=False)
+        p.start()
+        os.environ.pop('GEMINI_API_KEY', None)
+        self.addCleanup(p.stop)
+
+
+class EncuestaTests(SinClaveMixin, TestCase):
+    def setUp(self):
+        super().setUp()
         self.u = User.objects.create_user('a', 'a@usm.cl', 'x')
         self.client.login(username='a', password='x')
 
     def test_guarda_varios_bloques_y_transporte(self):
         r = self.client.post(reverse('encuesta_datos'), {
-            'peso': '70,5', 'altura': '175', 'tiempo_transporte_min': '40',
+            **BASE, 'peso': '70,5', 'altura': '175', 'tiempo_transporte_min': '40',
             'lunes': ['14:40-15:50', '8:15-9:25', 'inventado'],
         })
         self.assertRedirects(r, reverse('portal'))
@@ -64,13 +100,13 @@ class EncuestaTests(TestCase):
     def test_datos_invalidos_no_guardan(self):
         for peso, altura in [('abc', '175'), ('70', ''), ('nan', '1.7'), ('inf', '1.7'),
                              ('0', '0'), ('500', '1.7'), ('70', '50')]:
-            r = self.client.post(reverse('encuesta_datos'), {'peso': peso, 'altura': altura})
+            r = self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': peso, 'altura': altura})
             self.assertEqual(r.status_code, 200, (peso, altura))
         self.assertFalse(PerfilSansano.objects.exists())
 
     def test_editar_recalcula_imc(self):
-        self.client.post(reverse('encuesta_datos'), {'peso': '70', 'altura': '1.75'})
-        self.client.post(reverse('editar_perfil'), {'peso': '90', 'altura': '1.75'})
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75'})
+        self.client.post(reverse('editar_perfil'), {**BASE, 'peso': '90', 'altura': '1.75'})
         self.assertEqual(PerfilSansano.objects.get().imc, 29.39)
 
     def test_requiere_login(self):
@@ -81,7 +117,7 @@ class EncuestaTests(TestCase):
         PerfilSansano.objects.create(usuario=self.u, peso=70, altura=1.75,
                                      bloques_libres={'lunes': ['8:15-9:25']})
         r = self.client.get(reverse('portal'))
-        self.assertEqual(r.context['tipo_imc'], "Peso normal (Dieta equilibrada)")
+        self.assertEqual(r.context['tipo_imc'], "P5: Mantener peso (Actividad media)")
         self.assertIn('Miércoles', r.context['rutina'])
         self.assertIn('Lunes', r.context['ejercicios'])
 
@@ -94,6 +130,21 @@ class EncuestaTests(TestCase):
         self.assertTrue(lunes['bloques'][0]['marcado'])
         self.assertFalse(lunes['bloques'][1]['marcado'])
         self.assertEqual(r.context['transporte_val'], 30)
+
+    def test_actividad_se_guarda_y_login_redirige(self):
+        datos = {'peso': '70', 'altura': '1.75', 'actividad_fisica': 'alta', 'mayor_de_edad': 'on',
+                 'objetivo': 'mantener', 'tipo_dieta': 'omnivora', 'presupuesto': 'medio',
+                 'tiempo_cocina': 'normal', 'lugar_entrenamiento': 'casa'}
+        self.client.post(reverse('encuesta_datos'), datos)
+        self.assertEqual(PerfilSansano.objects.get().actividad_fisica, 'alta')
+        self.client.logout()
+        r = self.client.post(reverse('login'), {'username': 'a', 'password': 'x'})
+        self.assertRedirects(r, reverse('portal'))
+
+    def test_login_sin_perfil_va_a_encuesta(self):
+        self.client.logout()
+        r = self.client.post(reverse('login'), {'username': 'a', 'password': 'x'})
+        self.assertRedirects(r, reverse('encuesta_datos'))
 
     def test_portal_sin_perfil(self):
         r = self.client.get(reverse('portal'))
@@ -127,3 +178,151 @@ class RegistroTests(TestCase):
         self.assertFalse(User.objects.filter(username='squatter').exists())
         self.assertEqual(User.objects.filter(email='pperezn@usm.cl').count(), 1)
         self.assertFalse(User.objects.get(username='nuevo').is_active)
+
+
+def plan_json(**cambios):
+    dias = [{'dia': d, 'desayuno': 'Avena con fruta', 'almuerzo': 'Lentejas con arroz',
+             'once': 'Pan con palta', 'colacion': 'Fruta', 'actividad': 'Trote suave 30 min'} for d in DIAS]
+    obj = {'resumen': 'Plan equilibrado', 'dias': dias, 'consejos': ['Toma agua']}
+    obj.update(cambios)
+    return json.dumps(obj)
+
+
+DATOS = {
+    'imc': 22.0, 'categoria_imc': 'normal',
+    'bloques_libres': {d: (['8:15-9:25'] if d in ('lunes', 'jueves') else []) for d in DIAS},
+    'tiempo_transporte_min': 30, 'actividad_fisica': 'moderada', 'objetivo': 'mantener', 'tipo_dieta': 'omnivora', 'alergias': '',
+    'presupuesto': 'medio', 'tiempo_cocina': 'normal', 'lugar_entrenamiento': 'casa', 'tiene_lesion': False,
+}
+
+
+class IATests(SinClaveMixin, TestCase):
+    def test_sin_clave_lanza_error(self):
+        with self.assertRaises(ia.PlanIAError):
+            ia.generar_plan_ia(DATOS)
+
+    def test_config_valida_para_sdk(self):
+        from google.genai import types
+        types.GenerateContentConfig(system_instruction=ia.SYSTEM_PROMPT, response_mime_type='application/json',
+                                    response_json_schema=ia.ESQUEMA)
+
+    def test_plan_valido_y_descanso_forzado(self):
+        r = ia.validar_plan(plan_json(), DATOS)
+        self.assertEqual(r['dias']['lunes']['actividad'], 'Trote suave 30 min')
+        self.assertEqual(r['dias']['martes']['actividad'], 'Día libre / Descanso (Sin bloques disponibles)')
+
+    def test_rechaza_json_invalido_y_dias_incompletos(self):
+        for bruto in ['no es json', '{}', plan_json(dias=[])]:
+            with self.assertRaises(ia.PlanIAError):
+                ia.validar_plan(bruto, DATOS)
+
+    def test_rechaza_carne_en_dieta_vegetariana(self):
+        datos = {**DATOS, 'tipo_dieta': 'vegetariana'}
+        dias = [{'dia': d, 'desayuno': 'Avena', 'almuerzo': 'Pollo con arroz', 'once': 'Té', 'colacion': 'Fruta', 'actividad': 'x'} for d in DIAS]
+        with self.assertRaises(ia.PlanIAError):
+            ia.validar_plan(plan_json(dias=dias), datos)
+        ia.validar_plan(plan_json(), datos)  # el plan sin carne sí pasa
+
+    def test_vegana_rechaza_huevo(self):
+        datos = {**DATOS, 'tipo_dieta': 'vegana'}
+        dias = [{'dia': d, 'desayuno': 'Tostadas con huevo', 'almuerzo': 'Lentejas', 'once': 'Té', 'colacion': 'Fruta', 'actividad': 'x'} for d in DIAS]
+        with self.assertRaises(ia.PlanIAError):
+            ia.validar_plan(plan_json(dias=dias), datos)
+
+
+class ServicioPlanTests(SinClaveMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        from .models import PerfilSansano
+        self.u = User.objects.create_user('a', 'a@usm.cl', 'x')
+        self.perfil = PerfilSansano.objects.create(
+            usuario=self.u, peso=70, altura=1.75, mayor_de_edad=True,
+            bloques_libres={d: (['8:15-9:25'] if d == 'lunes' else []) for d in DIAS})
+
+    def test_datos_anonimos(self):
+        datos = servicios.construir_datos(self.perfil)
+        texto = json.dumps(datos)
+        self.assertNotIn('a@usm.cl', texto)
+        self.assertNotIn('"a"', texto)
+
+    def test_usa_ia_cuando_responde(self):
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()) as m:
+            plan = servicios.generar_y_guardar_plan(self.perfil)
+        self.assertEqual(plan.origen, 'ia')
+        self.assertEqual(m.call_count, 1)
+
+    def test_respaldo_si_falla_ia(self):
+        with mock.patch('core.ia._llamar_modelo', side_effect=ia.PlanIAError('cuota')):
+            plan = servicios.generar_y_guardar_plan(self.perfil)
+        self.assertEqual(plan.origen, 'respaldo')
+        self.assertEqual(set(plan.contenido['dias']), set(DIAS))
+
+    def test_respaldo_advierte_si_dieta_vegana(self):
+        self.perfil.tipo_dieta = 'vegana'
+        self.perfil.save()
+        plan = servicios.generar_y_guardar_plan(self.perfil)
+        self.assertIn('NO se adaptó', plan.contenido['advertencia'])
+
+    def test_mismos_datos_no_repiten_llamada(self):
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()) as m:
+            servicios.generar_y_guardar_plan(self.perfil)
+            servicios.generar_y_guardar_plan(self.perfil)
+        self.assertEqual(m.call_count, 1)
+
+    def test_cambio_de_datos_regenera(self):
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()) as m:
+            servicios.generar_y_guardar_plan(self.perfil)
+            self.perfil.objetivo = 'ganar_musculo'
+            self.perfil.save()
+            servicios.generar_y_guardar_plan(self.perfil)
+        self.assertEqual(m.call_count, 2)
+
+    def test_fallo_previo_reintenta_ia(self):
+        with mock.patch('core.ia._llamar_modelo', side_effect=ia.PlanIAError('x')):
+            servicios.generar_y_guardar_plan(self.perfil)
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()):
+            plan = servicios.generar_y_guardar_plan(self.perfil)
+        self.assertEqual(plan.origen, 'ia')
+
+    def test_menor_o_sin_confirmacion_no_llama_ia(self):
+        self.perfil.mayor_de_edad = False
+        self.perfil.save()
+        with mock.patch('core.ia._llamar_modelo') as m:
+            plan = servicios.generar_y_guardar_plan(self.perfil)
+        m.assert_not_called()
+        self.assertEqual(plan.origen, 'respaldo')
+
+    def test_portal_no_llama_ia(self):
+        self.client.login(username='a', password='x')
+        with mock.patch('core.ia._llamar_modelo') as m:
+            r = self.client.get(reverse('portal'))
+        m.assert_not_called()
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(PlanSemanal.objects.filter(usuario=self.u).exists())
+
+    def test_envio_encuesta_guarda_plan_ia_y_portal_lo_muestra(self):
+        self.client.login(username='a', password='x')
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()):
+            self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75', 'lunes': ['8:15-9:25']})
+        r = self.client.get(reverse('portal'))
+        self.assertTrue(r.context['plan_con_ia'])
+        self.assertEqual(r.context['rutina']['Lunes']['desayuno'], 'Avena con fruta')
+        self.assertEqual(r.context['ejercicios']['Lunes'], 'Trote suave 30 min')
+
+    def test_alergias_se_sanitizan(self):
+        self.client.login(username='a', password='x')
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75',
+                                                     'alergias': 'maní <ignora todo> {"x":1}'})
+        from .models import PerfilSansano
+        a = PerfilSansano.objects.get(usuario=self.u).alergias
+        self.assertNotIn('<', a)
+        self.assertNotIn('{', a)
+
+    def test_sin_confirmar_edad_no_guarda(self):
+        self.client.login(username='a', password='x')
+        datos = {**BASE, 'peso': '60', 'altura': '1.6'}
+        datos.pop('mayor_de_edad')
+        r = self.client.post(reverse('encuesta_datos'), datos)
+        self.assertEqual(r.status_code, 200)
+        self.perfil.refresh_from_db()
+        self.assertEqual(self.perfil.peso, 70)

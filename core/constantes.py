@@ -11,3 +11,41 @@ BLOQUES_VALIDOS = [
 ]
 
 DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
+
+ETIQUETAS_DIA = {
+    'lunes': 'Lunes', 'martes': 'Martes', 'miercoles': 'Miércoles', 'jueves': 'Jueves',
+    'viernes': 'Viernes', 'sabado': 'Sábado', 'domingo': 'Domingo',
+}
+
+OBJETIVOS = [
+    ('bajar_grasa', 'Perder grasa / bajar de peso'),
+    ('ganar_musculo', 'Ganar masa muscular'),
+    ('mantener', 'Mantener mi peso'),
+    ('energia', 'Mejorar energía y resistencia'),
+]
+DIETAS = [
+    ('omnivora', 'Omnívora'),
+    ('vegetariana', 'Vegetariana'),
+    ('vegana', 'Vegana'),
+]
+PRESUPUESTOS = [
+    ('bajo', 'Bajo (comida económica)'),
+    ('medio', 'Medio'),
+    ('alto', 'Alto'),
+]
+TIEMPOS_COCINA = [
+    ('15min', 'Hasta 15 minutos por comida'),
+    ('normal', 'Puedo cocinar con calma'),
+    ('meal_prep', 'Prefiero preparar para varios días'),
+]
+LUGARES = [
+    ('casa', 'En casa (sin equipo)'),
+    ('gimnasio', 'Gimnasio'),
+    ('aire_libre', 'Al aire libre'),
+]
+
+ACTIVIDADES = [
+    ('leve', 'Leve (poco o ningún ejercicio frecuente)'),
+    ('moderada', 'Moderada (ejercicio ligero, 2 a 3 veces por semana)'),
+    ('alta', 'Alta (ejercicio intenso, 4 o más veces por semana)'),
+]
