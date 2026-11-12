@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from .constantes import ACTIVIDADES, DIETAS, LUGARES, OBJETIVOS, PRESUPUESTOS, TIEMPOS_COCINA
+
 
 class PerfilSansano(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -23,6 +25,16 @@ class PerfilSansano(models.Model):
         validators=[MaxValueValidator(240)],
         help_text="Minutos de transporte por trayecto (casa-universidad)",
     )
+    mayor_de_edad = models.BooleanField(default=False, help_text="Confirma tener 18 años o más")
+    actividad_fisica = models.CharField(
+        max_length=10, choices=ACTIVIDADES, default='moderada', help_text="Nivel de actividad física actual")
+    objetivo = models.CharField(max_length=20, choices=OBJETIVOS, default='mantener')
+    tipo_dieta = models.CharField(max_length=20, choices=DIETAS, default='omnivora')
+    alergias = models.CharField(max_length=100, blank=True, help_text="Alergias o intolerancias (texto corto)")
+    presupuesto = models.CharField(max_length=10, choices=PRESUPUESTOS, default='medio')
+    tiempo_cocina = models.CharField(max_length=10, choices=TIEMPOS_COCINA, default='normal')
+    lugar_entrenamiento = models.CharField(max_length=12, choices=LUGARES, default='casa')
+    tiene_lesion = models.BooleanField(default=False, help_text="Molestia o lesión que limita ejercicios")
 
     @property
     def imc(self):
@@ -32,3 +44,17 @@ class PerfilSansano(models.Model):
 
     def __str__(self):
         return f"Perfil de {self.usuario.username}"
+
+
+class PlanSemanal(models.Model):
+    """Plan generado una vez al enviar la encuesta; el portal solo lo lee."""
+    ORIGENES = [('ia', 'Generado por IA'), ('respaldo', 'Plan base por reglas')]
+
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='plan')
+    contenido = models.JSONField(default=dict)
+    origen = models.CharField(max_length=10, choices=ORIGENES)
+    huella = models.CharField(max_length=64, help_text="Hash de los datos usados para generarlo")
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Plan de {self.usuario.username} ({self.origen})"

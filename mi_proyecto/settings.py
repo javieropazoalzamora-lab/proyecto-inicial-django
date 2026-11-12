@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,13 +22,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-gsl=hw8bqj-*)@zzn1lf#pd&=*-kt9hzt34+$oka+9l)_4w_^0'
+# --- Seguridad: valores sensibles desde variables de entorno ---
+# DJANGO_DEBUG=0 desactiva el modo desarrollo (usar en producción).
+DEBUG = os.environ.get('DJANGO_DEBUG', '1') != '0'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# En producción la clave es obligatoria. En desarrollo se usa una clave local de mentira.
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'clave-solo-para-desarrollo-local-no-usar-en-produccion'
+    else:
+        raise ImproperlyConfigured("Falta la variable de entorno DJANGO_SECRET_KEY")
 
-ALLOWED_HOSTS = []
+# Ej: DJANGO_ALLOWED_HOSTS="midominio.cl,www.midominio.cl"
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if h.strip()]
 
 
 # Application definition
@@ -105,7 +115,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'es'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'
 
 USE_I18N = True
 
