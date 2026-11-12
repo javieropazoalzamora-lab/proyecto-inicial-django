@@ -4,7 +4,7 @@ import json
 import logging
 
 from . import ia, planes_base
-from .horarios import ventanas_con_minutos
+from .horarios import ventanas_con_minutos, viaje_del_dia
 from .constantes import DIAS, ETIQUETAS_DIA
 from .models import PlanSemanal
 
@@ -19,7 +19,11 @@ def construir_datos(perfil):
         'imc': perfil.imc,
         'categoria_imc': planes_base.clasificar_imc(perfil.imc),
         'bloques_libres': perfil.bloques_libres,
-        'ventanas_libres': {d: ventanas_con_minutos(perfil.bloques_libres.get(d)) for d in DIAS},
+        'ventanas_libres': {d: ventanas_con_minutos(perfil.bloques_libres.get(d), (perfil.clases or {}).get(d))
+                            for d in DIAS},
+        # Solo días con clases: primera/última clase y, si hay transporte, cuándo sale y llega a casa
+        'dias_con_clases': {d: v for d in DIAS
+                            if (v := viaje_del_dia((perfil.clases or {}).get(d), perfil.tiempo_transporte_min))},
         'tiempo_transporte_min': perfil.tiempo_transporte_min,
         'actividad_fisica': perfil.actividad_fisica,
         'objetivo': perfil.objetivo,

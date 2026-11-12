@@ -12,12 +12,12 @@ from django.shortcuts import render, redirect
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 
-from .constantes import (ACTIVIDADES, BLOQUES_VALIDOS, DIAS, ETIQUETAS_DIA, DIETAS, LUGARES, OBJETIVOS,
+from .constantes import (DIAS_CORTOS, MODULOS, ACTIVIDADES, BLOQUES_VALIDOS, DIAS, ETIQUETAS_DIA, DIETAS, LUGARES, OBJETIVOS,
                          PRESUPUESTOS, TIEMPOS_COCINA)
 from .forms import RegistroSansanoForm, EncuestaPerfilForm
 from .models import PerfilSansano, PlanSemanal
 from . import planes_base, servicios
-from .horarios import ventanas_texto
+from .horarios import ventanas_texto, modulos_cubiertos, modulos_desde_post, viaje_del_dia
 
 
 def inicio(request):
@@ -85,6 +85,19 @@ def cerrar_sesion(request):
     return redirect('login')
 
 
+def construir_grilla(estados):
+    """estados: {dia: (libres, clases)} -> filas por módulo con el estado de cada día."""
+    filas = []
+    for n, ini, fin in MODULOS:
+        celdas = []
+        for d in DIAS:
+            libres, clases = estados[d]
+            estado = 'clase' if n in clases else 'libre' if n in libres else ''
+            celdas.append({'dia': d, 'etiqueta': ETIQUETAS_DIA[d], 'estado': estado})
+        filas.append({'n': n, 'ini': ini, 'fin': fin, 'celdas': celdas})
+    return filas
+
+
 @login_required(login_url='login')
 def encuesta_datos(request):
     """Encuesta de perfil (única vista; sirve para crear y para editar)."""
@@ -100,6 +113,7 @@ def encuesta_datos(request):
                     'peso': cd['peso'],
                     'altura': cd['altura'],
                     'bloques_libres': cd['bloques'],
+                    'clases': cd['clases'],
                     'tiempo_transporte_min': cd['tiempo_transporte_min'],
                     'mayor_de_edad': cd['mayor_de_edad'],
                     'actividad_fisica': cd['actividad_fisica'],
@@ -122,7 +136,7 @@ def encuesta_datos(request):
         peso_val = request.POST.get('peso', '')
         altura_val = request.POST.get('altura', '')
         transporte_val = request.POST.get('tiempo_transporte_min', '')
-        elegidos = {d: request.POST.getlist(d) for d in DIAS}
+        estados = {d: modulos_desde_post(request.POST, d) for d in DIAS}
         actual = {k: request.POST.get(k, '') for k in
                   ('actividad_fisica', 'objetivo', 'tipo_dieta', 'presupuesto', 'tiempo_cocina', 'lugar_entrenamiento', 'alergias')}
         actual['mayor_de_edad'] = 'mayor_de_edad' in request.POST
@@ -131,7 +145,8 @@ def encuesta_datos(request):
         peso_val = perfil.peso if perfil else ''
         altura_val = perfil.altura if perfil else ''
         transporte_val = (perfil.tiempo_transporte_min if perfil and perfil.tiempo_transporte_min is not None else '')
-        elegidos = perfil.bloques_libres if perfil else {}
+        estados = {d: (modulos_cubiertos((perfil.bloques_libres or {}).get(d)) - set((perfil.clases or {}).get(d, [])),
+                       set((perfil.clases or {}).get(d, []))) if perfil else (set(), set()) for d in DIAS}
         actual = {
             'actividad_fisica': perfil.actividad_fisica if perfil else 'moderada',
             'objetivo': perfil.objetivo if perfil else 'mantener',
@@ -147,22 +162,14 @@ def encuesta_datos(request):
     def opciones(choices, clave):
         return [{'valor': v, 'etiqueta': e, 'marcado': v == actual[clave]} for v, e in choices]
 
-    dias_ui = [
-        {
-            'clave': d,
-            'etiqueta': d.capitalize() if d != 'miercoles' else 'Miércoles',
-            'bloques': [{'valor': b, 'marcado': b in (elegidos.get(d) or [])} for b in BLOQUES_VALIDOS],
-        }
-        for d in DIAS
-    ]
-    if d_sab := next((x for x in dias_ui if x['clave'] == 'sabado'), None):
-        d_sab['etiqueta'] = 'Sábado'
+    grilla = construir_grilla(estados)
 
     return render(request, 'core2/formulario.html', {
         'bloques_horarios': BLOQUES_VALIDOS,
         'perfil': perfil,
         'form': form,
-        'dias_ui': dias_ui,
+        'grilla': grilla,
+        'dias_cols': [{'clave': d, 'corta': DIAS_CORTOS[d], 'etiqueta': ETIQUETAS_DIA[d]} for d in DIAS],
         'peso_val': peso_val,
         'altura_val': altura_val,
         'transporte_val': transporte_val,
@@ -194,6 +201,7 @@ def portal(request):
     alerta = None
     plan = None
     semana = []
+    grilla = []
 
     if imc is not None:
         tipo_imc = planes_base.perfil_alimentacion(imc, perfil.actividad_fisica)[1]['etiqueta']
@@ -208,6 +216,10 @@ def portal(request):
             # Sin confirmación de mayoría de edad no se usa IA: plan por reglas, sin esperar.
             plan = servicios.generar_y_guardar_plan(perfil, usar_ia=False)
         rutina_alimentacion, rutina_ejercicios = servicios.plan_a_contexto(plan.contenido)
+        clases_perfil = perfil.clases or {}
+        grilla = construir_grilla({
+            d: (modulos_cubiertos(bloques_libres.get(d)) - set(clases_perfil.get(d, [])), set(clases_perfil.get(d, [])))
+            for d in DIAS})
         for dia in DIAS:
             d = plan.contenido['dias'][dia]
             semana.append({
@@ -215,9 +227,11 @@ def portal(request):
                 'desayuno': d['desayuno'], 'almuerzo': d['almuerzo'], 'once': d['once'],
                 'colacion': d.get('colacion', ''),
                 'actividad': d['actividad'],
+                'rutina': d.get('rutina'),
                 'descanso': not bloques_libres.get(dia),
+                'viaje': viaje_del_dia(clases_perfil.get(dia), perfil.tiempo_transporte_min),
                 # El horario se muestra aparte solo si el texto de la actividad no lo repite
-                'bloques': ('' if any(v in d['actividad'] for v in ventanas_texto(bloques_libres.get(dia)))
+                'bloques': ('' if not d.get('rutina') and any(v in d['actividad'] for v in ventanas_texto(bloques_libres.get(dia)))
                             else ' · '.join(ventanas_texto(bloques_libres.get(dia)))),
             })
 
@@ -231,6 +245,9 @@ def portal(request):
         'alerta_profesional': alerta,
         'plan': plan,
         'semana': semana,
+        'grilla': grilla,
+        'hay_clases': any((perfil.clases or {}).values()) if perfil else False,
+        'dias_cols': [{'clave': d, 'corta': DIAS_CORTOS[d], 'etiqueta': ETIQUETAS_DIA[d]} for d in DIAS],
         'resumen_plan': plan.contenido.get('resumen') if plan else None,
         'consejos': plan.contenido.get('consejos', []) if plan else [],
         'advertencia_plan': plan.contenido.get('advertencia') if plan else None,

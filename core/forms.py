@@ -5,6 +5,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 
+from .horarios import modulos_desde_post, ventanas_desde_modulos
 from .constantes import (ACTIVIDADES, BLOQUES_VALIDOS, DIAS, DIETAS, LUGARES, OBJETIVOS,
                          PRESUPUESTOS, TIEMPOS_COCINA)
 
@@ -76,14 +77,11 @@ class EncuestaPerfilForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        data = self.data
-        bloques = {}
+        bloques, clases = {}, {}
         for dia in DIAS:
-            if hasattr(data, 'getlist'):
-                elegidos = data.getlist(dia)
-            else:
-                v = data.get(dia, [])
-                elegidos = v if isinstance(v, (list, tuple)) else [v]
-            bloques[dia] = [b for b in BLOQUES_VALIDOS if b in elegidos]  # orden canónico, sin duplicados
+            libres, cl = modulos_desde_post(self.data, dia)
+            bloques[dia] = ventanas_desde_modulos(libres)   # ventanas libres, p. ej. ['9:40-13:40']
+            clases[dia] = sorted(cl)
         cleaned['bloques'] = bloques
+        cleaned['clases'] = clases
         return cleaned

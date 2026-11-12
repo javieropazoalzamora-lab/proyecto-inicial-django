@@ -50,6 +50,11 @@
   .comida p { font-size: 13px; line-height: 1.35; margin-top: 2px; }
   .actividad { margin-top: auto; border-top: 2px solid var(--accent); background: var(--bg); }
   .actividad.descanso small, .actividad.descanso p { color: var(--mute); }
+  .rutina { margin-top: 6px; font-size: 13px; line-height: 1.35; }
+  .rutina .meta { display: block; font-size: 11px; color: var(--mute); margin: 2px 0 4px; }
+  .rutina ul { padding-left: 16px; margin: 0; }
+  .rutina li { margin-bottom: 2px; }
+  .rutina li em { color: var(--mute); font-style: normal; }
   .actividad .bloque { font-size: 12px; font-weight: 700; color: var(--accent); }
 
 
@@ -113,6 +118,7 @@
   .act-body { padding: 12px 14px; font-size: 14px; }
   .act-body .bloque { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
   .act-card.descanso .act-body { color: var(--mute); }
+  .viaje { font-size: 12px; color: var(--mute); margin-bottom: 8px; line-height: 1.5; }
   .solo-print { display: none; }
 
   @media print {
@@ -218,13 +224,45 @@
   <!-- 2) ACTIVIDAD FÍSICA -->
   <section class="panel-tab" id="p-actividad" role="tabpanel" aria-labelledby="tab-actividad" hidden>
     <h2 class="solo-print">Actividad física</h2>
+
+    <div class="panel">
+      <h2>Mi horario semanal</h2>
+      <div class="leyenda" style="margin-bottom:8px">
+        <span><i class="l"></i>Libre</span>{% if hay_clases %}<span><i class="c"></i>Clase</span>{% endif %}
+        <a href="{% url 'encuesta_datos' %}" style="margin-left:auto;text-decoration:underline">Editar horario</a>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="horario">
+        <thead><tr><th class="hora"></th>{% for c in dias_cols %}<th title="{{ c.etiqueta }}">{{ c.corta }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for fila in grilla %}
+          <tr>
+            <th class="hora" scope="row">{{ fila.n }}º · {{ fila.ini }}</th>
+            {% for c in fila.celdas %}<td class="{% if c.estado %}est-{{ c.estado }}{% endif %}" {% if c.estado %}title="{{ c.etiqueta }} · {{ fila.ini }}-{{ fila.fin }}"{% endif %}>{% if c.estado == 'libre' %}✓{% elif c.estado == 'clase' %}C{% endif %}</td>{% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% if not hay_clases %}<p class="nota" style="margin-top:8px">Agrega tus clases en "Mis datos" para ver a qué hora sales y llegas a casa.</p>{% endif %}
+    </div>
+
     <div class="semana">
       {% for d in semana %}
       <div class="act-card {% if d.descanso %}descanso{% endif %}" data-dia="{{ d.dia }}">
         <h3>{{ d.dia }} <em></em></h3>
         <div class="act-body">
+          {% if d.viaje %}
+          <div class="viaje">🎓 Clases {{ d.viaje.primera_clase }}–{{ d.viaje.ultima_clase }}{% if d.viaje.sale_de_casa %}<br>🚌 Sales {{ d.viaje.sale_de_casa }} · Llegas {{ d.viaje.llega_a_casa }}{% endif %}</div>
+          {% endif %}
           {% if d.bloques %}<div class="bloque">🕒 {{ d.bloques }}</div>{% endif %}
-          <p>{{ d.actividad }}</p>
+          {% if d.rutina %}
+          <div class="rutina">
+            <strong>{{ d.rutina.titulo }}</strong>
+            <span class="meta">{{ d.rutina.duracion_min }} min · intensidad {{ d.rutina.intensidad }}</span>
+            <ul>{% for e in d.rutina.ejercicios %}<li>{{ e.nombre }}{% if e.detalle %} <em>— {{ e.detalle }}</em>{% endif %}</li>{% endfor %}</ul>
+          </div>
+          {% else %}<p>{{ d.actividad }}</p>{% endif %}
         </div>
       </div>
       {% endfor %}
