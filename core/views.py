@@ -5,7 +5,9 @@ from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.mail import EmailMessage
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -15,6 +17,7 @@ from .constantes import (ACTIVIDADES, BLOQUES_VALIDOS, DIAS, ETIQUETAS_DIA, DIET
 from .forms import RegistroSansanoForm, EncuestaPerfilForm
 from .models import PerfilSansano, PlanSemanal
 from . import planes_base, servicios
+from .horarios import ventanas_texto
 
 
 def inicio(request):
@@ -109,8 +112,7 @@ def encuesta_datos(request):
                     'tiene_lesion': cd['tiene_lesion'],
                 },
             )
-            # Se genera UNA vez aquí (IA con respaldo); el portal solo lee el plan guardado.
-            servicios.generar_y_guardar_plan(perfil)
+            # El plan se genera en el portal (con animación) mediante plan_generar.
             return redirect('portal')
     else:
         form = EncuestaPerfilForm()
@@ -197,8 +199,13 @@ def portal(request):
         tipo_imc = planes_base.perfil_alimentacion(imc, perfil.actividad_fisica)[1]['etiqueta']
         alerta = planes_base.alerta_profesional(imc)
         plan = PlanSemanal.objects.filter(usuario=request.user).first()
-        if plan is None:
-            # Perfiles anteriores a la IA: plan por reglas, sin llamar a la API desde el portal.
+        if not servicios.plan_vigente(perfil, plan):
+            if perfil.mayor_de_edad:
+                # Hay que (re)generar: el portal muestra la animación y el navegador llama a plan_generar.
+                return render(request, 'core2/portal.html', {
+                    'perfil': perfil, 'generando': True, 'aviso_salud': planes_base.AVISO_SALUD,
+                })
+            # Sin confirmación de mayoría de edad no se usa IA: plan por reglas, sin esperar.
             plan = servicios.generar_y_guardar_plan(perfil, usar_ia=False)
         rutina_alimentacion, rutina_ejercicios = servicios.plan_a_contexto(plan.contenido)
         for dia in DIAS:
@@ -209,8 +216,9 @@ def portal(request):
                 'colacion': d.get('colacion', ''),
                 'actividad': d['actividad'],
                 'descanso': not bloques_libres.get(dia),
-                'bloques': ('' if any(b in d['actividad'] for b in (bloques_libres.get(dia) or []))
-                            else ' · '.join(bloques_libres.get(dia) or [])),
+                # El horario se muestra aparte solo si el texto de la actividad no lo repite
+                'bloques': ('' if any(v in d['actividad'] for v in ventanas_texto(bloques_libres.get(dia)))
+                            else ' · '.join(ventanas_texto(bloques_libres.get(dia)))),
             })
 
     return render(request, 'core2/portal.html', {
@@ -228,4 +236,24 @@ def portal(request):
         'advertencia_plan': plan.contenido.get('advertencia') if plan else None,
         'plan_con_ia': bool(plan and plan.origen == 'ia'),
         'falta_completar': bool(perfil and not perfil.mayor_de_edad),
+        'puede_reintentar_ia': bool(plan and plan.origen == 'respaldo' and perfil.mayor_de_edad),
     })
+
+
+ESPERA_MIN_SEG = 15
+
+
+@login_required(login_url='login')
+@require_POST
+def plan_generar(request):
+    """Genera (con IA y respaldo) y guarda el plan. Lo llama el portal por fetch."""
+    perfil = PerfilSansano.objects.filter(usuario=request.user).first()
+    if perfil is None or perfil.imc is None:
+        return JsonResponse({'ok': False, 'error': 'Falta completar la encuesta.'}, status=400)
+    plan = PlanSemanal.objects.filter(usuario=request.user).first()
+    if plan and plan.huella == servicios.huella_actual(perfil) and \
+            (timezone.now() - plan.actualizado).total_seconds() < ESPERA_MIN_SEG:
+        # Evita gastar cuota con clics repetidos: se devuelve el plan que ya está guardado.
+        return JsonResponse({'ok': True, 'origen': plan.origen, 'reutilizado': True})
+    plan = servicios.generar_y_guardar_plan(perfil, usar_ia=perfil.mayor_de_edad)
+    return JsonResponse({'ok': True, 'origen': plan.origen})

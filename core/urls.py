@@ -9,6 +9,7 @@ urlpatterns = [
     path('logout/', views.cerrar_sesion, name='logout'),
     path('formulario/', views.encuesta_datos, name='encuesta_datos'),
     path('portal/', views.portal, name='portal'),
+    path('plan/generar/', views.plan_generar, name='plan_generar'),
     path('activar/<uidb64>/<token>/', views.activar_cuenta, name='activar_cuenta'),
     path('ajustes/clave/', auth_views.PasswordChangeView.as_view(template_name='core2/cambiar_clave.html'), name='cambiar_clave'),
     path('ajustes/clave/lista/', auth_views.PasswordChangeDoneView.as_view(template_name='core2/clave_cambiada.html'), name='password_change_done'),

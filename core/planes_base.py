@@ -3,6 +3,8 @@
 Las comidas se copiaron tal cual desde la vista original.
 """
 
+from .horarios import ventanas_texto
+
 AVISO_SALUD = (
     "Esta propuesta es orientativa y no reemplaza la opinión de un médico o "
     "nutricionista. Si tienes alguna condición de salud, consúltalo antes de cambiar tu alimentación o rutina."
@@ -194,7 +196,7 @@ def ejercicios_base(categoria, bloques):
     from .constantes import DIAS
     resultado = {}
     for dia in DIAS:
-        lista = bloques.get(dia) or []
+        lista = ventanas_texto(bloques.get(dia))
         if not lista:
             resultado[dia.capitalize()] = SIN_TIEMPO
             continue

@@ -4,6 +4,7 @@ import json
 import logging
 
 from . import ia, planes_base
+from .horarios import ventanas_con_minutos
 from .constantes import DIAS, ETIQUETAS_DIA
 from .models import PlanSemanal
 
@@ -18,6 +19,7 @@ def construir_datos(perfil):
         'imc': perfil.imc,
         'categoria_imc': planes_base.clasificar_imc(perfil.imc),
         'bloques_libres': perfil.bloques_libres,
+        'ventanas_libres': {d: ventanas_con_minutos(perfil.bloques_libres.get(d)) for d in DIAS},
         'tiempo_transporte_min': perfil.tiempo_transporte_min,
         'actividad_fisica': perfil.actividad_fisica,
         'objetivo': perfil.objetivo,
@@ -32,6 +34,15 @@ def construir_datos(perfil):
 
 def _huella(datos):
     return hashlib.sha256(json.dumps(datos, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def huella_actual(perfil):
+    return _huella(construir_datos(perfil))
+
+
+def plan_vigente(perfil, plan):
+    """True si el plan guardado corresponde a los datos actuales del perfil."""
+    return plan is not None and plan.huella == huella_actual(perfil)
 
 
 def generar_y_guardar_plan(perfil, usar_ia=True):
