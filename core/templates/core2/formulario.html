@@ -143,21 +143,50 @@
         <input type="number" min="0" max="240" step="1" name="tiempo_transporte_min" id="tiempo_transporte_min" value="{{ transporte_val }}" placeholder="Ej: 40">
       </div>
 
-      <div class="fm-full form-section-title">3. Bloques Libres por Día <span class="hint">(puedes marcar varios)</span></div>
+      <div class="fm-full form-section-title">3. Tu horario de la semana</div>
 
-      {% for dia in dias_ui %}
-      <div class="form-group fm-full">
-        <label>{{ dia.etiqueta }}:</label>
-        <div class="bloques-grid">
-          {% for b in dia.bloques %}
-            <label class="bloque-op">
-              <input type="checkbox" name="{{ dia.clave }}" value="{{ b.valor }}" {% if b.marcado %}checked{% endif %}>
-              {{ b.valor }}
-            </label>
+      <div class="fm-full">
+        <p class="hint" style="margin-bottom:8px">
+          <b>Clic izquierdo</b> = marca <b>libre</b> (rato que puedes usar) · <b>Clic derecho</b> = marca <b>clase</b>.
+          Mantén apretado y <b>arrastra</b> para pintar varias casillas seguidas. Si empiezas sobre una casilla ya
+          marcada con ese mismo estado, arrastrar la <b>borra</b>.
+          Marcar tus clases es opcional, pero permite calcular tus huecos y usar tu tiempo de transporte.
+        </p>
+        <div class="pincel" role="radiogroup" aria-label="Pincel (para celular o pantalla táctil)">
+          <span class="hint">En celular, elige el pincel:</span>
+          <label><input type="radio" name="pincel" value="auto" checked> Mouse (izq/der)</label>
+          <label><input type="radio" name="pincel" value="libre"> Libre</label>
+          <label><input type="radio" name="pincel" value="clase"> Clase</label>
+          <label><input type="radio" name="pincel" value="borrar"> Borrar</label>
+        </div>
+        <div class="leyenda" style="margin-bottom:8px">
+          <span><i class="l"></i>Libre (izq.)</span><span><i class="c"></i>Clase (der.)</span><span><i></i>Vacío / no disponible</span>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="horario" id="horario">
+          <thead><tr><th class="hora"></th>{% for c in dias_cols %}<th title="{{ c.etiqueta }}">{{ c.corta }}</th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for fila in grilla %}
+            <tr>
+              <th class="hora" scope="row">{{ fila.n }}º · {{ fila.ini }}</th>
+              {% for c in fila.celdas %}
+              <td>
+                <button type="button" class="celda" data-dia="{{ c.dia }}" data-n="{{ fila.n }}" data-estado="{{ c.estado }}"
+                        aria-label="{{ c.etiqueta }}, módulo {{ fila.n }} ({{ fila.ini }} a {{ fila.fin }})"></button>
+                <input type="checkbox" name="libre_{{ c.dia }}" value="{{ fila.n }}" hidden {% if c.estado == 'libre' %}checked{% endif %}>
+                <input type="checkbox" name="clase_{{ c.dia }}" value="{{ fila.n }}" hidden {% if c.estado == 'clase' %}checked{% endif %}>
+              </td>
+              {% endfor %}
+            </tr>
           {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <div class="acciones-grilla" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button type="button" class="btn ghost" id="btn-huecos" style="padding:8px 16px;font-size:13px">Marcar como libres los huecos entre mis clases</button>
+          <button type="button" class="btn ghost" id="btn-limpiar" style="padding:8px 16px;font-size:13px">Limpiar todo</button>
         </div>
       </div>
-      {% endfor %}
 
       <div class="fm-full form-section-title">4. Tus objetivos y alimentación</div>
 
@@ -230,4 +259,73 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var ciclo = ['', 'libre', 'clase'];
+    var nombres = { '': 'vacío', libre: 'libre', clase: 'clase' };
+    function celda(dia, n) { return document.querySelector('.celda[data-dia="' + dia + '"][data-n="' + n + '"]'); }
+    function aplicar(btn, estado) {
+      btn.dataset.estado = estado;
+      btn.textContent = estado === 'libre' ? '✓' : estado === 'clase' ? 'C' : '';
+      var td = btn.parentNode;
+      td.querySelector('input[name^="libre_"]').checked = estado === 'libre';
+      td.querySelector('input[name^="clase_"]').checked = estado === 'clase';
+      var base = btn.getAttribute('aria-label').split(':')[0];
+      btn.setAttribute('aria-label', base + ': ' + nombres[estado]);
+    }
+    document.querySelectorAll('.celda').forEach(function (b) { aplicar(b, b.dataset.estado); });
+
+    var tabla = document.getElementById('horario');
+    var pintando = null; // estado que se está pintando ('' = borrar)
+    function pincelElegido() { return document.querySelector('input[name="pincel"]:checked').value; }
+    function celdaEn(x, y) {
+      var el = document.elementFromPoint(x, y);
+      return el && el.classList && el.classList.contains('celda') ? el : null;
+    }
+    tabla.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    tabla.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest ? e.target.closest('.celda') : null;
+      if (!b) return;
+      e.preventDefault();
+      var objetivo, modo = pincelElegido();
+      if (modo === 'auto') objetivo = e.button === 2 ? 'clase' : e.button === 0 ? 'libre' : null;
+      else objetivo = modo === 'borrar' ? '' : modo;
+      if (objetivo === null) return;
+      if (objetivo !== '' && b.dataset.estado === objetivo) objetivo = ''; // mismo estado: borrar
+      pintando = objetivo;
+      aplicar(b, pintando);
+    });
+    tabla.addEventListener('pointermove', function (e) {
+      if (pintando === null) return;
+      var b = celdaEn(e.clientX, e.clientY);
+      if (b && b.dataset.estado !== pintando) aplicar(b, pintando);
+    });
+    function soltar() { pintando = null; }
+    window.addEventListener('pointerup', soltar);
+    window.addEventListener('pointercancel', soltar);
+    // Teclado: Enter/Espacio cicla vacío → libre → clase
+    tabla.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.celda') : null;
+      if (b && e.detail === 0) aplicar(b, ciclo[(ciclo.indexOf(b.dataset.estado) + 1) % ciclo.length]);
+    });
+    document.getElementById('btn-huecos').addEventListener('click', function () {
+      var dias = {};
+      document.querySelectorAll('.celda').forEach(function (b) { (dias[b.dataset.dia] = dias[b.dataset.dia] || []).push(b); });
+      Object.keys(dias).forEach(function (d) {
+        var bs = dias[d], idx = [];
+        bs.forEach(function (b, i) { if (b.dataset.estado === 'clase') idx.push(i); });
+        if (!idx.length) return;
+        for (var i = idx[0]; i <= idx[idx.length - 1]; i++) {
+          if (bs[i].dataset.estado !== 'clase') aplicar(bs[i], 'libre');
+        }
+      });
+    });
+    document.getElementById('btn-limpiar').addEventListener('click', function () {
+      document.querySelectorAll('.celda').forEach(function (b) { aplicar(b, ''); });
+    });
+  })();
+</script>
 {% endblock %}

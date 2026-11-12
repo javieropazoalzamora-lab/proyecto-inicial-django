@@ -20,6 +20,8 @@ class PerfilSansano(models.Model):
         default=dict, blank=True,
         help_text="Bloques libres por día: {'lunes': ['8:15-9:25'], ...}",
     )
+    # {'lunes': [1, 2, 3, 4], ...}: módulos en que el estudiante tiene clase (opcional)
+    clases = models.JSONField(default=dict, blank=True, help_text="Módulos con clase por día")
     tiempo_transporte_min = models.PositiveSmallIntegerField(
         null=True, blank=True,
         validators=[MaxValueValidator(240)],

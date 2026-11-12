@@ -12,7 +12,9 @@ import os
 import re
 
 from .constantes import DIAS
+from .horarios import ventanas_texto
 from .planes_base import SIN_TIEMPO
+from .rutinas import rutina_base, texto_resumen, validar_rutina
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,14 @@ Reglas:
 - Alimentación: no propongas restricciones calóricas agresivas, ayunos ni suplementos. Nada de "dietas milagro".
 - Ejercicio: úsalo SOLO dentro de las ventanas_libres de cada día; si un día no tiene bloques, la actividad es descanso.
   Los huecos vienen en ventanas_libres (inicio, fin y minutos por ventana). Considera el tiempo de transporte (no propongas sesiones que no alcancen a hacerse). Respeta lugar_entrenamiento.
+  Cada ventana puede traer 'lugar': 'universidad' (hay clases después, el estudiante sigue en el campus: sesiones cortas o comida/colación, sin ducha ni cocina)
+  o 'casa' (ya terminó sus clases: puede ir a casa y cocinar). dias_con_clases indica primera_clase, ultima_clase, sale_de_casa y llega_a_casa:
+  usa sale_de_casa para sugerir un desayuno (antes de salir) y llega_a_casa para la cena/ejercicio nocturno. Un día ausente de dias_con_clases no tiene clases.
   Si tiene_lesion es true, propón solo ejercicio de bajo impacto y sugiere consultar a un profesional.
+- Rutina: en cada día con ventanas_libres incluye "rutina" con titulo, duracion_min (nunca más que el hueco más largo menos 10 minutos),
+  intensidad (baja, media o alta) y de 3 a 8 ejercicios (nombre y detalle breve, p. ej. "3 x 12"), con calentamiento y vuelta a la calma si dura 20 min o más.
+  Usa ejercicios básicos y seguros, acordes a lugar_entrenamiento (casa = sin equipo). Con tiene_lesion o categoria_imc obesidad, intensidad baja y bajo impacto.
+  Varía los tipos de sesión durante la semana (fuerza, cardio, movilidad) y deja días de descanso entre sesiones intensas. En días sin ventanas_libres, no incluyas "rutina".
 - No des consejos médicos ni diagnósticos. No calcules ni modifiques el IMC (ya viene calculado).
 - Cada texto debe ser breve (máximo 200 caracteres)."""
 
@@ -54,6 +63,21 @@ ESQUEMA = {
                     "once": {"type": "string"},
                     "colacion": {"type": "string"},
                     "actividad": {"type": "string"},
+                    "rutina": {
+                        "type": "object",
+                        "properties": {
+                            "titulo": {"type": "string"},
+                            "duracion_min": {"type": "integer"},
+                            "intensidad": {"type": "string", "enum": ["baja", "media", "alta"]},
+                            "ejercicios": {
+                                "type": "array", "minItems": 1, "maxItems": 8,
+                                "items": {"type": "object",
+                                          "properties": {"nombre": {"type": "string"}, "detalle": {"type": "string"}},
+                                          "required": ["nombre", "detalle"]},
+                            },
+                        },
+                        "required": ["titulo", "duracion_min", "intensidad", "ejercicios"],
+                    },
                 },
                 "required": ["dia", "desayuno", "almuerzo", "once", "colacion", "actividad"],
             },
@@ -122,9 +146,11 @@ def validar_plan(bruto, datos):
 
     bloques = datos.get('bloques_libres', {})
     dias = {}
+    brutos_dia = {}
     for item in obj['dias']:
         if not isinstance(item, dict) or item.get('dia') not in DIAS or item['dia'] in dias:
             raise PlanIAError("Día inválido o repetido")
+        brutos_dia[item['dia']] = item
         dias[item['dia']] = {
             'desayuno': _texto(item.get('desayuno')),
             'almuerzo': _texto(item.get('almuerzo')),
@@ -136,9 +162,22 @@ def validar_plan(bruto, datos):
         raise PlanIAError("Faltan días en el plan")
 
     # Regla dura: sin bloques libres no hay ejercicio, diga lo que diga la IA.
+    # Con bloques: se valida la rutina de la IA (duración ≤ hueco, intensidad baja si hay lesión/IMC extremo)
+    # y, si no sirve, se usa la rutina base por reglas.
+    sesion = 0
     for dia in DIAS:
         if not bloques.get(dia):
             dias[dia]['actividad'] = SIN_TIEMPO
+            dias[dia]['rutina'] = None
+            continue
+        rutina = validar_rutina(brutos_dia[dia].get('rutina'), datos, dia)
+        if rutina is None:
+            rutina = rutina_base(datos, dia, sesion)
+            if rutina is not None:
+                dias[dia]['actividad'] = texto_resumen(rutina, ' y '.join(ventanas_texto(bloques.get(dia))))
+        dias[dia]['rutina'] = rutina
+        if rutina is not None:
+            sesion += 1
 
     # Regla dura: el tipo de dieta no se negocia.
     prohibidas = ()

@@ -123,6 +123,30 @@
     .app main { max-width: 1240px; margin: 0 auto; }
     .anon main { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
 
+
+    /* ---------- Grilla de horario (encuesta y portal) ---------- */
+    .horario { border-collapse: separate; border-spacing: 3px; width: 100%; font-size: 12px; table-layout: fixed; }
+    .horario th { font-weight: 600; color: var(--mute); padding: 4px 2px; text-align: center; }
+    .horario th.hora { width: 74px; text-align: right; padding-right: 6px; font-weight: 500; font-size: 11px; white-space: nowrap; }
+    .horario td { padding: 0; }
+    .celda {
+      display: block; width: 100%; height: 30px; border-radius: 6px; border: 1px solid var(--line);
+      background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 700; padding: 0; color: var(--ink);
+    }
+    .celda:hover { border-color: var(--accent); }
+    .celda:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .celda[data-estado="libre"], td.est-libre { background: var(--soft); border-color: var(--accent); color: var(--accent); }
+    .celda[data-estado="clase"], td.est-clase { background: var(--mute); border-color: var(--mute); color: var(--surface); }
+    td.est-libre, td.est-clase { height: 24px; border-radius: 6px; border: 1px solid; text-align: center; font-size: 11px; font-weight: 700; }
+    .celda{touch-action:none;user-select:none;-webkit-user-select:none}
+    .horario{user-select:none;-webkit-user-select:none}
+    .pincel{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:.85rem}
+    .pincel label{display:inline-flex;gap:4px;align-items:center;cursor:pointer}
+    .leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--mute); align-items: center; }
+    .leyenda i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line); vertical-align: -2px; margin-right: 4px; }
+    .leyenda i.l { background: var(--soft); border-color: var(--accent); }
+    .leyenda i.c { background: var(--mute); border-color: var(--mute); }
+
     @media (max-width: 860px) {
       .app { grid-template-columns: 1fr; }
       .sidebar {

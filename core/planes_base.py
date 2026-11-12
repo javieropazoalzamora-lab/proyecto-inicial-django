@@ -212,13 +212,22 @@ def plan_respaldo(datos):
     _cod, perfil_pdf = perfil_alimentacion(datos['imc'], datos.get('actividad_fisica', 'moderada'))
     cat_ejercicio = 'obesidad' if datos.get('tiene_lesion') else categoria  # bajo impacto si hay lesión
     ejercicios = ejercicios_base(cat_ejercicio, datos.get('bloques_libres', {}))
+    from .rutinas import rutina_base, texto_resumen
     dias = {}
+    sesion = 0
     for dia in DIAS:
         c = perfil_pdf['dias'][dia]
+        rutina = rutina_base(datos, dia, sesion) if datos.get('ventanas_libres') else None
+        if rutina is not None:
+            sesion += 1
+            actividad = texto_resumen(rutina, ' y '.join(ventanas_texto(datos.get('bloques_libres', {}).get(dia))))
+        else:
+            actividad = ejercicios[dia.capitalize()]
         dias[dia] = {
             'desayuno': c['desayuno'], 'almuerzo': c['almuerzo'], 'once': c['once'],
             'colacion': c['colacion'],
-            'actividad': ejercicios[dia.capitalize()],
+            'actividad': actividad,
+            'rutina': rutina,
         }
     avisos = []
     if datos.get('tipo_dieta') != 'omnivora' or datos.get('alergias'):

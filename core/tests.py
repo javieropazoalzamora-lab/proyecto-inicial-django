@@ -44,6 +44,61 @@ class HorariosTests(TestCase):
         self.assertIn('Bloque 9:40-12:15:', e['Lunes'])
 
 
+class GrillaTests(TestCase):
+    def setUp(self):
+        self.u = User.objects.create_user('g', 'g@usm.cl', 'x')
+        self.client.login(username='g', password='x')
+
+    def post(self, extra):
+        datos = {'peso': '70', 'altura': '1.75', 'actividad_fisica': 'moderada', 'mayor_de_edad': 'on',
+                 'objetivo': 'mantener', 'tipo_dieta': 'omnivora', 'presupuesto': 'medio',
+                 'tiempo_cocina': 'normal', 'lugar_entrenamiento': 'casa', **extra}
+        return self.client.post(reverse('encuesta_datos'), datos)
+
+    def test_guarda_libres_y_clases_por_modulo(self):
+        self.post({'libre_lunes': ['3', '4', '12'], 'clase_lunes': ['1', '2'], 'tiempo_transporte_min': '40'})
+        p = PerfilSansano.objects.get()
+        self.assertEqual(p.clases['lunes'], [1, 2])
+        self.assertEqual(p.bloques_libres['lunes'], ['9:40-10:50', '16:40-17:15'])
+
+    def test_clase_gana_sobre_libre_y_se_ignoran_modulos_invalidos(self):
+        self.post({'libre_martes': ['1', '2', '99', 'x'], 'clase_martes': ['1']})
+        p = PerfilSansano.objects.get()
+        self.assertEqual(p.clases['martes'], [1])
+        self.assertEqual(p.bloques_libres['martes'], ['8:50-9:25'])
+
+    def test_ida_y_vuelta_de_la_grilla(self):
+        self.post({'libre_jueves': ['5', '6'], 'clase_jueves': ['9']})
+        g = self.client.get(reverse('encuesta_datos')).context['grilla']
+        estados = {f['n']: f['celdas'][3]['estado'] for f in g}  # columna jueves
+        self.assertEqual((estados[5], estados[6], estados[9], estados[1]), ('libre', 'libre', 'clase', ''))
+
+    def test_viaje_y_lugar_de_ventanas(self):
+        from .horarios import viaje_del_dia, ventanas_con_minutos
+        self.assertEqual(viaje_del_dia([1, 2, 11, 12], 40),
+                         {'primera_clase': '8:15', 'ultima_clase': '17:15', 'sale_de_casa': '7:35', 'llega_a_casa': '17:55'})
+        self.assertEqual(viaje_del_dia([1, 2], None), {'primera_clase': '8:15', 'ultima_clase': '9:25'})
+        self.assertIsNone(viaje_del_dia([], 40))
+        v = ventanas_con_minutos(['9:40-10:15', '12:30-13:05'], [1, 2, 3, 4, 5])  # clases hasta 11:40
+        self.assertEqual([x['lugar'] for x in v], ['universidad', 'casa'])
+        self.assertNotIn('lugar', ventanas_con_minutos(['9:40-10:15'], [])[0])  # sin clases: no se sabe
+
+    def test_datos_para_la_ia_incluyen_clases_y_transporte(self):
+        self.post({'clase_lunes': ['1', '2', '3', '4'], 'libre_lunes': ['9'], 'tiempo_transporte_min': '30'})
+        d = servicios.construir_datos(PerfilSansano.objects.get())
+        self.assertEqual(d['dias_con_clases']['lunes']['sale_de_casa'], '7:45')
+        self.assertEqual(d['ventanas_libres']['lunes'][0]['lugar'], 'casa')  # 14:40 es después de la última clase
+        self.assertNotIn('martes', d['dias_con_clases'])
+
+    def test_portal_muestra_viaje(self):
+        self.post({'clase_lunes': ['1', '2'], 'tiempo_transporte_min': '40'})
+        self.client.post(reverse('plan_generar'))
+        r = self.client.get(reverse('portal'))
+        self.assertTrue(r.context['hay_clases'])
+        self.assertEqual(r.context['semana'][0]['viaje']['sale_de_casa'], '7:35')
+        self.assertContains(r, 'Sales 7:35')
+
+
 class PlanesBaseTests(TestCase):
     def test_clasificacion(self):
         for imc, cat in [(17, 'bajo'), (18.5, 'normal'), (24.99, 'normal'),
@@ -142,10 +197,10 @@ class EncuestaTests(SinClaveMixin, TestCase):
         PerfilSansano.objects.create(usuario=self.u, peso=70, altura=1.75, tiempo_transporte_min=30,
                                      bloques_libres={'lunes': ['8:15-9:25']})
         r = self.client.get(reverse('encuesta_datos'))
-        lunes = r.context['dias_ui'][0]
-        self.assertEqual(lunes['etiqueta'], 'Lunes')
-        self.assertTrue(lunes['bloques'][0]['marcado'])
-        self.assertFalse(lunes['bloques'][1]['marcado'])
+        g = r.context['grilla']
+        self.assertEqual([g[0]['celdas'][0]['estado'], g[1]['celdas'][0]['estado'], g[2]['celdas'][0]['estado']],
+                         ['libre', 'libre', ''])
+        self.assertEqual(len(g), 14)
         self.assertEqual(r.context['transporte_val'], 30)
 
     def test_actividad_se_guarda_y_login_redirige(self):
@@ -353,7 +408,9 @@ class ServicioPlanTests(SinClaveMixin, TestCase):
         self.assertNotIn('generando', r.context)
         self.assertTrue(r.context['plan_con_ia'])
         self.assertEqual(r.context['rutina']['Lunes']['desayuno'], 'Avena con fruta')
-        self.assertEqual(r.context['ejercicios']['Lunes'], 'Trote suave 30 min')
+        # La IA no mandó rutina estructurada: se usa la rutina base y su resumen
+        self.assertIn('45 min', r.context['ejercicios']['Lunes'])
+        self.assertContains(r, 'Fuerza con peso corporal')
 
     def test_plan_generar_solo_post_y_con_login(self):
         self.assertEqual(self.client.post(reverse('plan_generar')).status_code, 302)
@@ -406,3 +463,101 @@ class ServicioPlanTests(SinClaveMixin, TestCase):
         self.assertEqual(r.status_code, 200)
         self.perfil.refresh_from_db()
         self.assertEqual(self.perfil.peso, 70)
+
+
+def datos_con_ventanas(**cambios):
+    d = dict(DATOS)
+    d['ventanas_libres'] = {dia: ([{'inicio': '8:15', 'fin': '9:25', 'minutos': 70}] if dia in ('lunes', 'jueves') else [])
+                            for dia in DIAS}
+    d.update(cambios)
+    return d
+
+
+RUTINA_IA = {'titulo': 'Circuito casero', 'duracion_min': 40, 'intensidad': 'alta',
+             'ejercicios': [{'nombre': 'Sentadillas', 'detalle': '3 x 12'}, {'nombre': 'Plancha', 'detalle': '30 s'}]}
+
+
+class RutinasTests(SinClaveMixin, TestCase):
+    def plan(self, datos, rutina):
+        dias = [{'dia': d, 'desayuno': 'a', 'almuerzo': 'b', 'once': 'c', 'colacion': 'd', 'actividad': 'Algo',
+                 **({'rutina': rutina} if rutina is not None else {})} for d in DIAS]
+        return ia.validar_plan(json.dumps({'resumen': 'r', 'dias': dias, 'consejos': []}), datos)
+
+    def test_minutos_disponibles_restan_margen_y_topan(self):
+        from . import rutinas
+        d = datos_con_ventanas()
+        self.assertEqual(rutinas.minutos_disponibles(d, 'lunes'), 60)
+        self.assertEqual(rutinas.minutos_disponibles(d, 'martes'), 0)
+        d['ventanas_libres']['lunes'] = [{'inicio': '9:00', 'fin': '16:00', 'minutos': 420}]
+        self.assertEqual(rutinas.minutos_disponibles(d, 'lunes'), 90)
+
+    def test_rutina_base_respeta_el_tiempo(self):
+        from . import rutinas
+        d = datos_con_ventanas()
+        r = rutinas.rutina_base(d, 'lunes', 0)
+        self.assertLessEqual(r['duracion_min'], 60)
+        self.assertIsNone(rutinas.rutina_base(d, 'martes', 0))
+        d['ventanas_libres']['lunes'] = [{'inicio': '8:15', 'fin': '8:35', 'minutos': 20}]  # 10 útiles
+        corta = rutinas.rutina_base(d, 'lunes', 0)
+        self.assertEqual(corta['duracion_min'], 10)
+        self.assertNotIn('Calentamiento', [e['nombre'] for e in corta['ejercicios']])
+
+    def test_rutina_base_conservadora_con_lesion_o_imc_extremo(self):
+        from . import rutinas
+        for extra in ({'tiene_lesion': True}, {'imc': 36.0, 'categoria_imc': 'obesidad'}, {'imc': 15.0, 'categoria_imc': 'bajo'}):
+            for i in range(4):
+                r = rutinas.rutina_base(datos_con_ventanas(**extra), 'lunes', i)
+                self.assertEqual(r['intensidad'], 'baja', extra)
+                self.assertIn(r['titulo'], ('Bajo impacto', 'Movilidad y estiramiento'))
+
+    def test_ia_rutina_se_valida_y_se_acota(self):
+        r = self.plan(datos_con_ventanas(), RUTINA_IA)['dias']
+        self.assertEqual(r['lunes']['rutina']['titulo'], 'Circuito casero')
+        self.assertEqual(r['lunes']['rutina']['intensidad'], 'alta')
+        self.assertEqual(r['lunes']['actividad'], 'Algo')  # se conserva el texto de la IA
+        largo = dict(RUTINA_IA, duracion_min=200)
+        self.assertEqual(self.plan(datos_con_ventanas(), largo)['dias']['lunes']['rutina']['duracion_min'], 60)
+
+    def test_ia_intensidad_alta_se_baja_con_lesion(self):
+        r = self.plan(datos_con_ventanas(tiene_lesion=True), RUTINA_IA)['dias']
+        self.assertEqual(r['lunes']['rutina']['intensidad'], 'baja')
+
+    def test_ia_rutina_invalida_usa_la_base_y_sin_hueco_no_hay_rutina(self):
+        for mala in (None, 'texto', {'titulo': '', 'duracion_min': 30, 'ejercicios': []},
+                     dict(RUTINA_IA, ejercicios=[]), dict(RUTINA_IA, duracion_min='mucho')):
+            r = self.plan(datos_con_ventanas(), mala)['dias']
+            self.assertIsNotNone(r['lunes']['rutina'], mala)
+            self.assertIn('min · intensidad', r['lunes']['actividad'])
+        r = self.plan(datos_con_ventanas(), RUTINA_IA)['dias']
+        self.assertIsNone(r['martes']['rutina'])  # sin hueco: descanso, aunque la IA mande rutina
+        self.assertIn('Descanso', r['martes']['actividad'])
+
+    def test_ia_rutina_sanea_textos(self):
+        sucia = dict(RUTINA_IA, titulo='  Hola\n\n  mundo  ' + 'x' * 100,
+                     ejercicios=[{'nombre': 'a' * 200, 'detalle': 'b'}] * 12 + ['basura', {'nombre': ''}])
+        r = self.plan(datos_con_ventanas(), sucia)['dias']['lunes']['rutina']
+        self.assertTrue(r['titulo'].startswith('Hola mundo'))
+        self.assertLessEqual(len(r['titulo']), 60)
+        self.assertEqual(len(r['ejercicios']), 8)
+        self.assertEqual(len(r['ejercicios'][0]['nombre']), 60)
+
+    def test_respaldo_incluye_rutinas_variadas(self):
+        d = datos_con_ventanas()
+        d['ventanas_libres'] = {dia: [{'inicio': '8:15', 'fin': '9:25', 'minutos': 70}] for dia in DIAS}
+        d['bloques_libres'] = {dia: ['8:15-9:25'] for dia in DIAS}
+        plan = planes_base.plan_respaldo(d)
+        titulos = {x['rutina']['titulo'] for x in plan['dias'].values()}
+        self.assertGreaterEqual(len(titulos), 2)
+        self.assertIn('8:15-9:25', plan['dias']['lunes']['actividad'])
+
+    def test_portal_muestra_la_rutina(self):
+        u = User.objects.create_user('r', 'r@usm.cl', 'x')
+        self.client.login(username='r', password='x')
+        self.client.post(reverse('encuesta_datos'), {
+            **BASE, 'peso': '70', 'altura': '1.75', 'libre_lunes': ['1', '2'], 'lugar_entrenamiento': 'gimnasio'})
+        self.client.post(reverse('plan_generar'))  # sin clave: respaldo
+        r = self.client.get(reverse('portal'))
+        rut = r.context['semana'][0]['rutina']
+        self.assertEqual(rut['ejercicios'][0]['nombre'], 'Calentamiento' if rut['duracion_min'] >= 20 else rut['ejercicios'][0]['nombre'])
+        self.assertContains(r, rut['titulo'])
+        self.assertIsNone(r.context['semana'][1]['rutina'])
