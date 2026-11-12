@@ -37,6 +37,7 @@ TIEMPOS_COCINA = [
     ('15min', 'Hasta 15 minutos por comida'),
     ('normal', 'Puedo cocinar con calma'),
     ('meal_prep', 'Prefiero preparar para varios días'),
+    ('familia', 'Cocina otra persona (familia, residencia, casino)'),
 ]
 LUGARES = [
     ('casa', 'En casa (sin equipo)'),

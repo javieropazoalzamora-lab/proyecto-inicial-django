@@ -27,6 +27,23 @@ class ModeloTests(TestCase):
         self.assertIsNone(p.imc)
 
 
+class HorariosTests(TestCase):
+    def test_une_bloques_seguidos_y_recreos(self):
+        from .horarios import ventanas_texto, ventanas_con_minutos
+        self.assertEqual(ventanas_texto(['9:40-10:50', '11:05-12:15', '12:30-13:40']), ['9:40-13:40'])
+        # el almuerzo (1 hora) NO se une
+        self.assertEqual(ventanas_texto(['12:30-13:40', '14:40-15:50']), ['12:30-13:40', '14:40-15:50'])
+        # desordenados y duplicados
+        self.assertEqual(ventanas_texto(['11:05-12:15', '9:40-10:50', '9:40-10:50']), ['9:40-12:15'])
+        self.assertEqual(ventanas_texto([]), [])
+        self.assertEqual(ventanas_con_minutos(['9:40-10:50', '11:05-12:15']),
+                         [{'inicio': '9:40', 'fin': '12:15', 'minutos': 155}])
+
+    def test_ejercicios_usan_ventana_unida(self):
+        e = planes_base.ejercicios_base('normal', {'lunes': ['9:40-10:50', '11:05-12:15']})
+        self.assertIn('Bloque 9:40-12:15:', e['Lunes'])
+
+
 class PlanesBaseTests(TestCase):
     def test_clasificacion(self):
         for imc, cat in [(17, 'bajo'), (18.5, 'normal'), (24.99, 'normal'),
@@ -140,6 +157,17 @@ class EncuestaTests(SinClaveMixin, TestCase):
         self.client.logout()
         r = self.client.post(reverse('login'), {'username': 'a', 'password': 'x'})
         self.assertRedirects(r, reverse('portal'))
+
+    def test_cocina_familia_se_guarda_y_portal_tiene_pestanas(self):
+        datos = {'peso': '70', 'altura': '1.75', 'actividad_fisica': 'moderada', 'mayor_de_edad': 'on',
+                 'objetivo': 'mantener', 'tipo_dieta': 'omnivora', 'presupuesto': 'medio',
+                 'tiempo_cocina': 'familia', 'lugar_entrenamiento': 'casa'}
+        self.client.post(reverse('encuesta_datos'), datos)
+        self.assertEqual(PerfilSansano.objects.get().tiempo_cocina, 'familia')
+        self.client.post(reverse('plan_generar'))
+        html = self.client.get(reverse('portal')).content.decode()
+        for t in ('p-resumen', 'p-actividad', 'p-nutricion'):
+            self.assertIn(f'id="{t}"', html)
 
     def test_login_sin_perfil_va_a_encuesta(self):
         self.client.logout()
@@ -296,18 +324,70 @@ class ServicioPlanTests(SinClaveMixin, TestCase):
         self.client.login(username='a', password='x')
         with mock.patch('core.ia._llamar_modelo') as m:
             r = self.client.get(reverse('portal'))
-        m.assert_not_called()
+        m.assert_not_called()  # el portal nunca llama a la IA por sí mismo
         self.assertEqual(r.status_code, 200)
-        self.assertTrue(PlanSemanal.objects.filter(usuario=self.u).exists())
+        self.assertTrue(r.context['generando'])  # la generación la dispara el navegador (plan_generar)
+        self.assertFalse(PlanSemanal.objects.filter(usuario=self.u).exists())
 
-    def test_envio_encuesta_guarda_plan_ia_y_portal_lo_muestra(self):
+    def test_portal_menor_o_sin_confirmacion_usa_respaldo_sin_esperar(self):
+        self.perfil.mayor_de_edad = False
+        self.perfil.save()
         self.client.login(username='a', password='x')
-        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()):
-            self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75', 'lunes': ['8:15-9:25']})
+        with mock.patch('core.ia._llamar_modelo') as m:
+            r = self.client.get(reverse('portal'))
+        m.assert_not_called()
+        self.assertNotIn('generando', r.context)
+        self.assertEqual(PlanSemanal.objects.get(usuario=self.u).origen, 'respaldo')
+
+    def test_envio_encuesta_lleva_al_portal_que_genera_con_animacion(self):
+        self.client.login(username='a', password='x')
+        r = self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75', 'lunes': ['8:15-9:25']})
+        self.assertRedirects(r, reverse('portal'), fetch_redirect_response=False)
+        self.assertFalse(PlanSemanal.objects.filter(usuario=self.u).exists())  # aún no se genera
         r = self.client.get(reverse('portal'))
+        self.assertTrue(r.context['generando'])
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()):
+            r = self.client.post(reverse('plan_generar'))
+        self.assertEqual(r.json(), {'ok': True, 'origen': 'ia'})
+        r = self.client.get(reverse('portal'))
+        self.assertNotIn('generando', r.context)
         self.assertTrue(r.context['plan_con_ia'])
         self.assertEqual(r.context['rutina']['Lunes']['desayuno'], 'Avena con fruta')
         self.assertEqual(r.context['ejercicios']['Lunes'], 'Trote suave 30 min')
+
+    def test_plan_generar_solo_post_y_con_login(self):
+        self.assertEqual(self.client.post(reverse('plan_generar')).status_code, 302)
+        self.client.login(username='a', password='x')
+        self.assertEqual(self.client.get(reverse('plan_generar')).status_code, 405)
+        User.objects.create_user('sinperfil', 's@usm.cl', 'x')
+        self.client.login(username='sinperfil', password='x')
+        self.assertEqual(self.client.post(reverse('plan_generar')).status_code, 400)
+
+    def test_plan_generar_no_repite_llamada_seguida(self):
+        self.client.login(username='a', password='x')
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75'})
+        with mock.patch('core.ia._llamar_modelo', return_value=plan_json()) as m:
+            self.client.post(reverse('plan_generar'))
+            r = self.client.post(reverse('plan_generar'))
+        self.assertEqual(m.call_count, 1)
+        self.assertTrue(r.json()['reutilizado'])
+
+    def test_si_la_ia_falla_el_portal_muestra_respaldo_y_ofrece_reintentar(self):
+        self.client.login(username='a', password='x')
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75'})
+        r = self.client.post(reverse('plan_generar'))  # sin clave: usa respaldo
+        self.assertEqual(r.json()['origen'], 'respaldo')
+        r = self.client.get(reverse('portal'))
+        self.assertFalse(r.context['plan_con_ia'])
+        self.assertTrue(r.context['puede_reintentar_ia'])
+        self.assertNotIn('generando', r.context)  # no entra en bucle de generación
+
+    def test_cambiar_datos_vuelve_a_generar(self):
+        self.client.login(username='a', password='x')
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '70', 'altura': '1.75'})
+        self.client.post(reverse('plan_generar'))
+        self.client.post(reverse('encuesta_datos'), {**BASE, 'peso': '80', 'altura': '1.75'})
+        self.assertTrue(self.client.get(reverse('portal')).context['generando'])
 
     def test_alergias_se_sanitizan(self):
         self.client.login(username='a', password='x')

@@ -29,10 +29,10 @@ Reglas:
 - Entrega un plan de 7 días (lunes a domingo): desayuno, almuerzo, once y una colación, más una actividad física por día.
 - Ajusta porciones e intensidad al objetivo y a actividad_fisica (leve, moderada o alta).
 - Respeta estrictamente tipo_dieta y alergias (si hay alergias o intolerancias, evita esos ingredientes).
-- Ajusta el costo al presupuesto y la complejidad al tiempo_cocina.
+- Ajusta el costo al presupuesto y la complejidad al tiempo_cocina. Si tiempo_cocina es "familia", otra persona cocina: propón platos caseros comunes, sin recetas ni preparación elaborada.
 - Alimentación: no propongas restricciones calóricas agresivas, ayunos ni suplementos. Nada de "dietas milagro".
-- Ejercicio: úsalo SOLO dentro de los bloques_libres de cada día; si un día no tiene bloques, la actividad es descanso.
-  Considera el tiempo de transporte (no propongas sesiones que no alcancen a hacerse). Respeta lugar_entrenamiento.
+- Ejercicio: úsalo SOLO dentro de las ventanas_libres de cada día; si un día no tiene bloques, la actividad es descanso.
+  Los huecos vienen en ventanas_libres (inicio, fin y minutos por ventana). Considera el tiempo de transporte (no propongas sesiones que no alcancen a hacerse). Respeta lugar_entrenamiento.
   Si tiene_lesion es true, propón solo ejercicio de bajo impacto y sugiere consultar a un profesional.
 - No des consejos médicos ni diagnósticos. No calcules ni modifiques el IMC (ya viene calculado).
 - Cada texto debe ser breve (máximo 200 caracteres)."""
@@ -90,7 +90,7 @@ def _llamar_modelo(datos):
         cliente = genai.Client(api_key=clave, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
         respuesta = cliente.models.generate_content(
             model=os.environ.get('GEMINI_MODEL', MODELO_POR_DEFECTO),
-            contents=json.dumps(datos, ensure_ascii=False),
+            contents=json.dumps({k: v for k, v in datos.items() if k != 'bloques_libres'}, ensure_ascii=False),
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 response_mime_type='application/json',

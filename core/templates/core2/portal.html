@@ -52,6 +52,84 @@
   .actividad.descanso small, .actividad.descanso p { color: var(--mute); }
   .actividad .bloque { font-size: 12px; font-weight: 700; color: var(--accent); }
 
+
+
+  /* Asistente de IA */
+  .ag-logo {
+    width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    background: var(--accent); color: var(--ac); position: relative;
+  }
+  .ag-logo svg { width: 20px; height: 20px; }
+  .ag-logo.pensando::after {
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent);
+    animation: girar 1.1s linear infinite;
+  }
+  .ag-logo.pensando { animation: latir 1.6s ease-in-out infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  @keyframes latir { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  .gen-card { max-width: 520px; margin: 60px auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .gen-card .ag-logo { width: 72px; height: 72px; }
+  .gen-card .ag-logo svg { width: 34px; height: 34px; }
+  .gen-card h1 { font-size: 22px; }
+  .gen-estado { color: var(--mute); font-size: 14px; min-height: 22px; }
+  .puntos span { display: inline-block; animation: salto 1.2s infinite; }
+  .puntos span:nth-child(2) { animation-delay: .15s; }
+  .puntos span:nth-child(3) { animation-delay: .3s; }
+  @keyframes salto { 0%,60%,100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
+  .gen-error { background: var(--warn-bg); color: var(--warn-ink); border-radius: var(--ri); padding: 12px 16px; font-size: 14px; }
+
+  .agente .ag-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .agente .ag-head b { display: block; font-size: 14px; line-height: 1.2; }
+  .agente .ag-head small { color: var(--mute); font-size: 12px; }
+  li.reveal:empty { display: none; }
+  .escribiendo::after { content: '▍'; margin-left: 1px; animation: parpadeo 0.8s steps(1) infinite; color: var(--accent); }
+  @keyframes parpadeo { 50% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ag-logo.pensando, .ag-logo.pensando::after, .puntos span, .escribiendo::after { animation: none; }
+  }
+  @media print { .agente .ag-logo { display: none; } }
+
+  /* Pestañas */
+  .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tab {
+    background: none; border: 0; padding: 10px 18px; font-weight: 600; color: var(--mute);
+    cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; border-radius: 8px 8px 0 0;
+  }
+  .tab:hover { color: var(--ink); background: var(--soft); }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .panel-tab[hidden] { display: none; }
+  .panel-tab { display: flex; flex-direction: column; gap: 16px; }
+  .acciones { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn.peq { padding: 8px 16px; font-size: 13px; }
+
+  .act-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--rc); overflow: hidden; }
+  .act-card.hoy { border-color: var(--accent); box-shadow: 0 0 0 2px var(--soft); }
+  .act-card h3 { background: var(--soft); padding: 9px 14px; font-size: 14px; display: flex; justify-content: space-between; }
+  .act-card h3 em { font-style: normal; font-size: 11px; color: var(--accent); font-weight: 700; }
+  .act-body { padding: 12px 14px; font-size: 14px; }
+  .act-body .bloque { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .act-card.descanso .act-body { color: var(--mute); }
+  .solo-print { display: none; }
+
+  @media print {
+    .sidebar, .tabs, .acciones, .badge-ia, nav { display: none !important; }
+    .app { display: block; }
+    main { padding: 0; }
+    body { background: #fff; font-size: 11px; }
+    .panel-tab[hidden] { display: flex !important; }   /* se imprime el plan completo */
+    .solo-print { display: block; }
+    .dia, .act-card, .panel, .stat { break-inside: avoid; }
+    .semana { grid-template-columns: repeat(4, 1fr); }
+    #p-nutricion { break-before: page; }
+    h2.solo-print { break-after: avoid; margin-bottom: 8px; }
+    .dia h3 em, .act-card h3 em { display: none; }
+    .dia.hoy, .act-card.hoy { box-shadow: none; border-color: var(--line); }
+  }
+
   .vacio { text-align: center; padding: 40px 24px; }
   .vacio h2 { margin-bottom: 8px; }
   .vacio p { color: var(--mute); margin-bottom: 18px; }
@@ -66,71 +144,108 @@
 {% block content %}
 <div class="portal">
 
-{% if perfil %}
+{% if generando %}
+
+  <div class="card gen-card" id="gen" role="status" aria-live="polite">
+    <span class="ag-logo pensando"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg></span>
+    <h1>Tu asistente está preparando tu plan</h1>
+    <p class="gen-estado" id="gen-estado">Revisando tus datos<span class="puntos"><span>.</span><span>.</span><span>.</span></span></p>
+    <p class="nota">Puede tardar unos segundos. Usa IA y tus datos pueden enviarse a Google (sin tu nombre ni correo).</p>
+    <div class="gen-error" id="gen-error" hidden></div>
+    <button type="button" class="btn" id="gen-reintentar" hidden>Reintentar</button>
+    {% csrf_token %}
+  </div>
+
+{% elif perfil %}
 
   <div class="p-head">
     <div>
       <h1>Mi plan semanal</h1>
       <p>Comidas y ejercicio según tus bloques libres y tu tiempo de transporte.</p>
     </div>
-    {% if plan_con_ia %}
-      <span class="badge-ia" title="Este plan fue escrito por Gemini a partir de tus datos">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
-        Plan generado con IA
-      </span>
-    {% else %}
-      <span class="badge-ia base" title="La IA no estuvo disponible o aún no se genera; se usó un plan base por reglas">
-        Plan base (sin IA)
-      </span>
-    {% endif %}
+    <div class="acciones">
+      {% if plan_con_ia %}
+        <span class="badge-ia" title="Este plan fue escrito por Gemini a partir de tus datos">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+          Plan generado con IA
+        </span>
+      {% else %}
+        <span class="badge-ia base" title="La IA no estuvo disponible o aún no se genera; se usó un plan base por reglas">Plan base (sin IA)</span>
+      {% endif %}
+      {% if puede_reintentar_ia %}<button type="button" class="btn ghost peq" id="btn-reintentar-ia">↻ Reintentar con IA</button>{% csrf_token %}{% endif %}
+      <button type="button" class="btn ghost peq" onclick="window.print()">⬇ Guardar como PDF</button>
+    </div>
   </div>
 
-  <div class="stats">
-    <div class="stat"><span>Peso</span><strong>{{ perfil.peso }} kg</strong></div>
-    <div class="stat"><span>Altura</span><strong>{{ perfil.altura }} m</strong></div>
-    <div class="stat"><span>IMC</span><strong>{{ perfil.imc }}</strong></div>
-    {% if perfil.tiempo_transporte_min is not None %}
-    <div class="stat"><span>Transporte</span><strong>{{ perfil.tiempo_transporte_min }} min</strong></div>
-    {% endif %}
-    <div class="stat"><span>Actividad</span><strong>{{ perfil.actividad_fisica|capfirst }}</strong></div>
-    <div class="stat wide"><span>Perfil asignado</span><strong>{{ tipo_imc }}</strong></div>
+  <div class="tabs" role="tablist" aria-label="Secciones del plan">
+    <button class="tab" role="tab" id="tab-resumen" aria-controls="p-resumen" aria-selected="true" data-tab="resumen">Resumen</button>
+    <button class="tab" role="tab" id="tab-actividad" aria-controls="p-actividad" aria-selected="false" data-tab="actividad" tabindex="-1">Actividad física</button>
+    <button class="tab" role="tab" id="tab-nutricion" aria-controls="p-nutricion" aria-selected="false" data-tab="nutricion" tabindex="-1">Nutrición</button>
   </div>
 
-  {% if alerta_profesional %}<div class="aviso alerta">⚠️ {{ alerta_profesional }}</div>{% endif %}
-  {% if advertencia_plan %}<div class="aviso alerta">{{ advertencia_plan }}</div>{% endif %}
-  {% if falta_completar %}
-    <div class="aviso suave">Tu perfil es anterior a las preguntas nuevas. <a href="{% url 'encuesta_datos' %}" style="text-decoration:underline;font-weight:600;">Complétalo</a> para obtener un plan con IA.</div>
-  {% endif %}
+  <!-- 1) RESUMEN -->
+  <section class="panel-tab" id="p-resumen" role="tabpanel" aria-labelledby="tab-resumen">
+    <div class="stats">
+      <div class="stat"><span>Peso</span><strong>{{ perfil.peso }} kg</strong></div>
+      <div class="stat"><span>Altura</span><strong>{{ perfil.altura }} m</strong></div>
+      <div class="stat"><span>IMC</span><strong>{{ perfil.imc }}</strong></div>
+      {% if perfil.tiempo_transporte_min is not None %}
+      <div class="stat"><span>Transporte</span><strong>{{ perfil.tiempo_transporte_min }} min</strong></div>
+      {% endif %}
+      <div class="stat"><span>Actividad</span><strong>{{ perfil.actividad_fisica|capfirst }}</strong></div>
+      <div class="stat wide"><span>Perfil asignado</span><strong>{{ tipo_imc }}</strong></div>
+    </div>
 
-  {% if plan_con_ia and resumen_plan or plan_con_ia and consejos %}
-  <div class="resumen">
-    {% if resumen_plan %}
-    <div class="panel"><h2>Resumen de tu plan</h2><p>{{ resumen_plan }}</p></div>
+    {% if alerta_profesional %}<div class="aviso alerta">⚠️ {{ alerta_profesional }}</div>{% endif %}
+    {% if advertencia_plan %}<div class="aviso alerta">{{ advertencia_plan }}</div>{% endif %}
+    {% if falta_completar %}
+      <div class="aviso suave">Tu perfil es anterior a las preguntas nuevas. <a href="{% url 'encuesta_datos' %}" style="text-decoration:underline;font-weight:600;">Complétalo</a> para obtener un plan con IA.</div>
     {% endif %}
-    {% if consejos %}
-    <div class="panel"><h2>Consejos</h2><ul>{% for c in consejos %}<li>{{ c }}</li>{% endfor %}</ul></div>
-    {% endif %}
-  </div>
-  {% endif %}
 
-  <div class="semana" id="semana">
-    {% for d in semana %}
-    <section class="dia" data-dia="{{ d.dia }}">
-      <h3>{{ d.dia }} <em></em></h3>
-      <div class="comida"><small>🍳 Desayuno</small><p>{{ d.desayuno }}</p></div>
-      <div class="comida"><small>🥗 Almuerzo</small><p>{{ d.almuerzo }}</p></div>
-      <div class="comida"><small>☕ Once</small><p>{{ d.once }}</p></div>
-      {% if d.colacion %}<div class="comida"><small>🍎 Colación</small><p>{{ d.colacion }}</p></div>{% endif %}
-      <div class="comida actividad {% if d.descanso %}descanso{% endif %}">
-        <small>🏋️ Actividad</small>
-        {% if d.bloques %}<div class="bloque">{{ d.bloques }}</div>{% endif %}
-        <p>{{ d.actividad }}</p>
+    {% if plan_con_ia and resumen_plan or plan_con_ia and consejos %}
+    <div class="resumen">
+      {% if resumen_plan %}
+      <div class="panel agente">
+        <div class="ag-head"><span class="ag-logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg></span><div><b>Asistente VitaSansano</b><small>Generado con IA</small></div></div>
+        <p class="reveal">{{ resumen_plan }}</p>
+      </div>{% endif %}
+      {% if consejos %}<div class="panel"><h2>Consejos</h2><ul>{% for c in consejos %}<li class="reveal">{{ c }}</li>{% endfor %}</ul></div>{% endif %}
+    </div>
+    {% endif %}
+    <p class="nota">{{ aviso_salud }}</p>
+  </section>
+
+  <!-- 2) ACTIVIDAD FÍSICA -->
+  <section class="panel-tab" id="p-actividad" role="tabpanel" aria-labelledby="tab-actividad" hidden>
+    <h2 class="solo-print">Actividad física</h2>
+    <div class="semana">
+      {% for d in semana %}
+      <div class="act-card {% if d.descanso %}descanso{% endif %}" data-dia="{{ d.dia }}">
+        <h3>{{ d.dia }} <em></em></h3>
+        <div class="act-body">
+          {% if d.bloques %}<div class="bloque">🕒 {{ d.bloques }}</div>{% endif %}
+          <p>{{ d.actividad }}</p>
+        </div>
       </div>
-    </section>
-    {% endfor %}
-  </div>
+      {% endfor %}
+    </div>
+  </section>
 
-  <p class="nota">{{ aviso_salud }}</p>
+  <!-- 3) NUTRICIÓN -->
+  <section class="panel-tab" id="p-nutricion" role="tabpanel" aria-labelledby="tab-nutricion" hidden>
+    <h2 class="solo-print">Nutrición</h2>
+    <div class="semana">
+      {% for d in semana %}
+      <section class="dia" data-dia="{{ d.dia }}">
+        <h3>{{ d.dia }} <em></em></h3>
+        <div class="comida"><small>🍳 Desayuno</small><p>{{ d.desayuno }}</p></div>
+        <div class="comida"><small>🥗 Almuerzo</small><p>{{ d.almuerzo }}</p></div>
+        <div class="comida"><small>☕ Once</small><p>{{ d.once }}</p></div>
+        {% if d.colacion %}<div class="comida"><small>🍎 Colación</small><p>{{ d.colacion }}</p></div>{% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </section>
 
 {% else %}
   <div class="card vacio">
@@ -145,16 +260,122 @@
 
 {% block extra_js %}
 <script>
-  // Resalta el día de hoy en la semana
   (function () {
+    // Pestañas (con teclado y recordando la pestaña en la URL)
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+    function mostrar(nombre, foco) {
+      tabs.forEach(function (t) {
+        var activa = t.dataset.tab === nombre;
+        t.setAttribute('aria-selected', activa ? 'true' : 'false');
+        t.tabIndex = activa ? 0 : -1;
+        document.getElementById('p-' + t.dataset.tab).hidden = !activa;
+        if (activa && foco) t.focus();
+      });
+      try { history.replaceState(null, '', '#' + nombre); } catch (e) {}
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () { mostrar(t.dataset.tab); });
+      t.addEventListener('keydown', function (e) {
+        var n = null;
+        if (e.key === 'ArrowRight') n = tabs[(i + 1) % tabs.length];
+        if (e.key === 'ArrowLeft') n = tabs[(i - 1 + tabs.length) % tabs.length];
+        if (n) { e.preventDefault(); mostrar(n.dataset.tab, true); }
+      });
+    });
+    var inicial = (location.hash || '').replace('#', '');
+    if (tabs.some(function (t) { return t.dataset.tab === inicial; })) mostrar(inicial);
+
+    // Resalta el día de hoy
     var nombres = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     var hoy = nombres[new Date().getDay()];
-    document.querySelectorAll('.dia').forEach(function (el) {
+    document.querySelectorAll('[data-dia]').forEach(function (el) {
       if (el.dataset.dia === hoy) {
         el.classList.add('hoy');
-        el.querySelector('h3 em').textContent = 'HOY';
+        var em = el.querySelector('h3 em'); if (em) em.textContent = 'HOY';
       }
     });
+  })();
+</script>
+
+<script>
+  (function () {
+    var token = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value;
+    var URL_GENERAR = "{% url 'plan_generar' %}";
+    var sinMovimiento = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function generar(alTerminar, alFallar) {
+      var ctl = new AbortController();
+      var t = setTimeout(function () { ctl.abort(); }, 45000);
+      fetch(URL_GENERAR, { method: 'POST', credentials: 'same-origin', signal: ctl.signal,
+                           headers: { 'X-CSRFToken': token || '' } })
+        .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .then(function (d) { clearTimeout(t); if (!d.ok) throw new Error(d.error || 'error'); alTerminar(d); })
+        .catch(function () { clearTimeout(t); alFallar(); });
+    }
+    function marcarReveal() { try { sessionStorage.setItem('vs-reveal', '1'); } catch (e) {} }
+
+    // 1) Pantalla de generación
+    var gen = document.getElementById('gen');
+    if (gen) {
+      var estado = document.getElementById('gen-estado');
+      var frases = ['Revisando tus bloques libres', 'Ajustando el menú a tu dieta y presupuesto',
+                    'Armando tu actividad física', 'Dando los últimos retoques'];
+      var i = 0;
+      var rot = setInterval(function () {
+        i = (i + 1) % frases.length;
+        estado.innerHTML = frases[i] + '<span class="puntos"><span>.</span><span>.</span><span>.</span></span>';
+      }, 3000);
+      var btn = document.getElementById('gen-reintentar'), err = document.getElementById('gen-error');
+      function lanzar() {
+        btn.hidden = true; err.hidden = true;
+        generar(function (d) {
+          clearInterval(rot);
+          if (d.origen === 'ia') marcarReveal();
+          location.reload();
+        }, function () {
+          clearInterval(rot);
+          err.hidden = false;
+          err.textContent = 'No se pudo generar el plan. Revisa tu conexión e inténtalo de nuevo.';
+          btn.hidden = false;
+          gen.querySelector('.ag-logo').classList.remove('pensando');
+        });
+      }
+      btn.addEventListener('click', function () { location.reload(); });
+      lanzar();
+    }
+
+    // 2) Reintentar con IA desde un plan base
+    var rb = document.getElementById('btn-reintentar-ia');
+    if (rb) rb.addEventListener('click', function () {
+      rb.disabled = true; rb.textContent = 'Generando…';
+      generar(function (d) {
+        if (d.origen === 'ia') marcarReveal();
+        else { rb.textContent = 'La IA no está disponible ahora'; setTimeout(function () { location.reload(); }, 1500); return; }
+        location.reload();
+      }, function () { rb.disabled = false; rb.textContent = '↻ Reintentar con IA'; });
+    });
+
+    // 3) Efecto de escritura del asistente (solo justo después de generar un plan con IA)
+    var activar = false;
+    try { activar = sessionStorage.getItem('vs-reveal') === '1'; sessionStorage.removeItem('vs-reveal'); } catch (e) {}
+    var items = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    if (activar && !sinMovimiento && items.length) {
+      var textos = items.map(function (el) { return el.textContent; });
+      var total = textos.reduce(function (a, t) { return a + t.length; }, 0);
+      var paso = Math.max(4, Math.min(22, 4500 / Math.max(total, 1)));
+      items.forEach(function (el) { el.textContent = ''; });
+      var k = 0;
+      (function siguiente() {
+        if (k >= items.length) return;
+        var el = items[k], txt = textos[k], n = 0;
+        el.classList.add('escribiendo');
+        (function tecla() {
+          n += 1; el.textContent = txt.slice(0, n);
+          if (n < txt.length) setTimeout(tecla, paso);
+          else { el.classList.remove('escribiendo'); k += 1; setTimeout(siguiente, 120); }
+        })();
+      })();
+    }
   })();
 </script>
 {% endblock %}
