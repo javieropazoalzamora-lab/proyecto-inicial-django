@@ -1,0 +1,271 @@
+{% extends "core2/base.html" %}
+{% load static %}
+
+{% block title %}Bienvenido | VitaSansano{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Contenedor de referencia para posicionar el escudo.
+     width:100% hace que la tarjeta ocupe todo el ancho disponible del <main> */
+  .hero-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  .hero-cinematic {
+    min-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Escudo USM (PNG transparente).
+     Por defecto (pantallas angostas): dentro de la esquina de la tarjeta. */
+  .hero-logo {
+    position: absolute;
+    top: 10px;
+    left: 16px;
+    width: 190px;
+    height: auto;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* Pantallas anchas: el escudo sale al margen izquierdo de la ventana,
+     fuera de la ilustración, dejando 24px libres antes de la tarjeta */
+  @media (min-width: 1360px) {
+    .hero-logo {
+      left: calc((100% - 100vw) / 2 + 44px);
+      width: min(230px, calc((100vw - 960px) / 2 - 44px - 24px));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-logo {
+      left: 10px;
+      width: 120px;
+    }
+  }
+
+  /* Contenedor de la ilustración: difumina hacia arriba para que no se note el recorte */
+  .hero-blueprint-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    -webkit-mask-image: linear-gradient(to top, #000 55%, transparent 100%);
+            mask-image: linear-gradient(to top, #000 55%, transparent 100%);
+  }
+
+  /* Pantallas angostas: el escudo queda sobre la tarjeta, así que se despeja esa esquina */
+  @media (max-width: 1359px) {
+    .hero-blueprint-container {
+      -webkit-mask-image:
+        linear-gradient(to top, #000 55%, transparent 100%),
+        radial-gradient(ellipse 340px 260px at 0 0, transparent 70%, #000 100%);
+      -webkit-mask-composite: source-in;
+              mask-image:
+        linear-gradient(to top, #000 55%, transparent 100%),
+        radial-gradient(ellipse 340px 260px at 0 0, transparent 70%, #000 100%);
+              mask-composite: intersect;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .hero-blueprint-container {
+      -webkit-mask-image:
+        linear-gradient(to top, #000 55%, transparent 100%),
+        radial-gradient(ellipse 200px 160px at 0 0, transparent 70%, #000 100%);
+              mask-image:
+        linear-gradient(to top, #000 55%, transparent 100%),
+        radial-gradient(ellipse 200px 160px at 0 0, transparent 70%, #000 100%);
+    }
+  }
+
+  /* Las líneas se pintan con el color del tema activo usando la imagen como máscara.
+     En temas claros se mezclan con el color del texto para que se vean más oscuras. */
+  .hero-blueprint {
+    position: absolute;
+    inset: 0;
+    margin-inline: auto;
+    max-width: 1400px;
+    background-color: color-mix(in srgb, var(--accent) 45%, var(--ink));
+    opacity: 0.3;
+    transition: background-color 0.4s ease, opacity 0.4s ease;
+
+    -webkit-mask-image: var(--blueprint);
+            mask-image: var(--blueprint);
+            mask-mode: luminance; /* si tu PNG tiene fondo transparente, cambia a: alpha */
+            mask-repeat: no-repeat;
+            mask-size: cover;
+            mask-position: bottom center;
+  }
+
+  /* Tema oscuro: líneas con el color de acento, más sutiles */
+  :root[data-theme="oscuro"] .hero-blueprint {
+    background-color: var(--accent);
+    opacity: 0.12;
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 480px;
+    height: 480px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: pulseGlow 5s ease-in-out infinite alternate;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeSlideUp 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+  }
+
+  .hero-title {
+    font-size: clamp(2.8rem, 7vw, 4.8rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 18px 0;
+    color: var(--ink);
+    opacity: 0;
+    animation: cinematicReveal 1.35s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+  }
+
+  .hero-title span {
+    color: var(--accent);
+  }
+
+  .hero-subtitle {
+    font-size: clamp(1rem, 2.2vw, 1.18rem);
+    color: var(--mute);
+    line-height: 1.6;
+    max-width: 540px;
+    margin: 0 0 34px 0;
+    opacity: 0;
+    animation: fadeSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.95s forwards;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: center;
+    opacity: 0;
+    animation: fadeSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 1.35s forwards;
+  }
+
+  .btn-hero {
+    padding: 14px 34px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: var(--ri);
+    text-decoration: none;
+    color: var(--ac);
+    background-color: var(--accent);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+
+  .btn-hero:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+
+  @keyframes cinematicReveal {
+    0% {
+      opacity: 0;
+      filter: blur(12px);
+      letter-spacing: 0.14em;
+      transform: scale(1.06) translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      filter: blur(0);
+      letter-spacing: -0.02em;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes fadeSlideUp {
+    0% {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulseGlow {
+    0% {
+      transform: scale(0.92);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero-wrap">
+  <!-- Escudo USM: en pantallas anchas queda en el margen izquierdo, fuera de la ilustración -->
+  <img class="hero-logo" src="{% static 'core/img/logo-usm.png' %}" alt="Escudo Universidad Técnica Federico Santa María">
+
+  <section class="hero-cinematic">
+    <!-- Ilustración USM: se pinta con el color del tema mediante máscara -->
+    <div class="hero-blueprint-container" aria-hidden="true">
+      <div class="hero-blueprint"
+           style="--blueprint: url('{% static 'core/img/usm-blueprint.png' %}')"></div>
+    </div>
+
+    <div class="hero-glow"></div>
+
+    <div class="hero-content">
+      <span class="hero-badge">Bienestar &amp; Rendimiento Universitario</span>
+
+      <h1 class="hero-title">Vita<span>Sansano</span></h1>
+
+      <p class="hero-subtitle">
+        Organiza tus bloques libres, optimiza tu alimentación y diseña rutinas adaptadas a tu ritmo académico.
+      </p>
+
+      <div class="hero-actions">
+        <a href="{% url 'login' %}" class="btn-hero">
+          Iniciar Sesión →
+        </a>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

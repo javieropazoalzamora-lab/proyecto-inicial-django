@@ -21,7 +21,7 @@ from .horarios import ventanas_texto, modulos_cubiertos, modulos_desde_post, via
 
 
 def inicio(request):
-    return redirect('login')
+    return render(request, 'core2/inicio.html')
 
 
 def iniciar_sesion(request):
