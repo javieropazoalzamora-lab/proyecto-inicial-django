@@ -1,0 +1,10 @@
+{% autoescape off %}¡Hola, {{ usuario.username }}!
+
+Gracias por registrarte en VitaSansano. Para confirmar tu correo institucional ({{ usuario.email }}) abre este enlace:
+
+{{ enlace }}
+
+El enlace sirve una sola vez y vence en {{ dias_validez }} día{{ dias_validez|pluralize }}.
+
+Si no fuiste tú, ignora este correo.
+{% endautoescape %}

@@ -1,0 +1,106 @@
+/* Inicio de sesión y registro. */
+
+.auth {
+  display: grid;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  gap: 16px;
+}
+/* Registro usa una tarjeta un poco más ancha y ajustada a su contenido */
+.auth.auth-ancha {
+  width: auto;
+  max-width: 480px;
+}
+.fm {
+  display: grid;
+  gap: 16px;
+}
+.form-group {
+  display: grid;
+  gap: 6px;
+}
+.form-group label {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--ri);
+  padding: 11px 14px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  transition: border-color 0.2s;
+}
+.form-group input:focus,
+.form-group select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* Animación de parpadeo lento */
+@keyframes parpadeoLento {
+  0% { opacity: 1; }
+  50% { opacity: 0.45; }
+  100% { opacity: 1; }
+}
+
+/* Alerta parpadeante en rojo con texto blanco (login: credenciales; registro: dominio @usm.cl) */
+.alerta-login,
+.alerta-usm {
+  background-color: #D9534F;
+  color: #FFFFFF;
+  padding: 12px 16px;
+  border-radius: var(--ri);
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 16px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(217, 83, 79, 0.2);
+  animation: parpadeoLento 2s infinite ease-in-out;
+}
+
+/* Errores del formulario de registro */
+.error-general {
+  background: #FADBD8;
+  border: 1px solid #F5B7B1;
+  color: #78281F;
+  border-radius: var(--ri);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.error-general ul {
+  margin: 4px 0 0 18px;
+  padding: 0;
+}
+.field-error {
+  color: var(--error, #D9534F);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.link {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.auth-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 13px;
+}

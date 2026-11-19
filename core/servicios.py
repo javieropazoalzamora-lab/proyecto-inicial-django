@@ -51,6 +51,9 @@ def plan_vigente(perfil, plan):
 
 def generar_y_guardar_plan(perfil, usar_ia=True):
     """Genera (una vez) el plan del perfil y lo guarda. Nunca lanza por fallos de la IA."""
+    if perfil.imc is None:
+        # Sin IMC válido no se puede clasificar al usuario (clasificar_imc(None) lanzaría TypeError)
+        raise ValueError("El perfil no tiene peso/altura válidos para calcular el IMC.")
     datos = construir_datos(perfil)
     huella = _huella(datos)
     existente = PlanSemanal.objects.filter(usuario=perfil.usuario).first()

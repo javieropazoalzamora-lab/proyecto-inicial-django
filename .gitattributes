@@ -1,0 +1,8 @@
+# Normaliza los saltos de línea: el repositorio guarda LF y cada sistema los convierte al suyo.
+* text=auto
+
+# Archivos binarios: nunca convertir
+*.png binary
+*.jpg binary
+*.ico binary
+*.sqlite3 binary
