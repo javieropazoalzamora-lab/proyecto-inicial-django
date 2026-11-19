@@ -1,0 +1,38 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Bienvenido | VitaSansano{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/css/inicio.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="hero-wrap">
+  <section class="hero-cinematic">
+    <!-- Ilustración USM: se pinta con el color del tema mediante máscara -->
+    <div class="hero-blueprint-container" aria-hidden="true">
+      <div class="hero-blueprint"
+           style="--blueprint: url('{% static 'core/img/usm-blueprint.png' %}')"></div>
+    </div>
+
+    <div class="hero-glow"></div>
+
+    <div class="hero-content">
+      <span class="hero-badge">Bienestar &amp; Rendimiento Universitario</span>
+
+      <h1 class="hero-title">Vita<span>Sansano</span></h1>
+
+      <p class="hero-subtitle">
+        Organiza tus bloques libres, optimiza tu alimentación y diseña rutinas adaptadas a tu ritmo académico.
+      </p>
+
+      <div class="hero-actions">
+        <a href="{% url 'login' %}" class="btn-hero">
+          Iniciar Sesión →
+        </a>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

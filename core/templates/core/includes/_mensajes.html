@@ -1,0 +1,15 @@
+{% comment %}
+Mensajes de django.contrib.messages (éxito, error, advertencia, información).
+Se incluye una sola vez en base.html, así cualquier vista puede usar messages.success(...), etc.
+{% endcomment %}
+{% if messages %}
+<div class="mensajes" role="status" aria-live="polite">
+  {% for m in messages %}
+  <div class="mensaje mensaje-{{ m.tags|default:'info' }}">
+    <span class="mensaje-icono" aria-hidden="true">{% if m.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}✓{% elif m.level == DEFAULT_MESSAGE_LEVELS.ERROR %}!{% elif m.level == DEFAULT_MESSAGE_LEVELS.WARNING %}⚠{% else %}i{% endif %}</span>
+    <span class="mensaje-texto">{{ m }}</span>
+    <button type="button" class="mensaje-cerrar" aria-label="Cerrar mensaje">×</button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

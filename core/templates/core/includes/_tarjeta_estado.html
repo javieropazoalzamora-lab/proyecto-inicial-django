@@ -1,0 +1,14 @@
+{% comment %}
+Tarjeta centrada de confirmación (contraseña cambiada, correo enviado, etc.).
+Uso:
+  {% include "core/includes/_tarjeta_estado.html" with icono="✓" titulo="..." texto="..." url_boton="login" texto_boton="..." %}
+`url_boton` es el nombre de una ruta de core/urls.py. Los estilos están en base.html (.estado-*).
+{% endcomment %}
+<div class="estado-contenedor">
+  <div class="card">
+    <div class="estado-badge">{{ icono|default:"✓" }}</div>
+    <h2 class="estado-titulo">{{ titulo }}</h2>
+    <p class="estado-texto">{{ texto }}</p>
+    <a href="{% url url_boton %}" class="btn estado-boton">{{ texto_boton }}</a>
+  </div>
+</div>

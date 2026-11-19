@@ -171,7 +171,9 @@ SIN_TIEMPO = "Día libre / Descanso (Sin bloques disponibles)"
 
 
 def clasificar_imc(imc):
-    """Devuelve la categoría ('bajo', 'normal', 'sobrepeso', 'obesidad')."""
+    """Devuelve la categoría ('bajo', 'normal', 'sobrepeso', 'obesidad'), o None si no hay IMC."""
+    if imc is None:
+        return None
     if imc < 18.5:
         return 'bajo'
     if imc < 25:

@@ -1,3 +1,5 @@
+import math
+
 from django.contrib.auth.models import User
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -40,9 +42,16 @@ class PerfilSansano(models.Model):
 
     @property
     def imc(self):
-        if not self.altura or self.altura <= 0:
+        """IMC = peso / altura². Devuelve None si algún dato falta o no es válido
+        (nunca lanza ZeroDivisionError ni TypeError)."""
+        try:
+            peso = float(self.peso)
+            altura = float(self.altura)
+        except (TypeError, ValueError):
             return None
-        return round(self.peso / (self.altura ** 2), 2)
+        if not (math.isfinite(peso) and math.isfinite(altura)) or peso <= 0 or altura <= 0:
+            return None
+        return round(peso / (altura ** 2), 2)
 
     def __str__(self):
         return f"Perfil de {self.usuario.username}"

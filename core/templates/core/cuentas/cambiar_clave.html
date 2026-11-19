@@ -1,0 +1,52 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}Cambiar Contraseña | VitaSansano{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'core/css/cuentas.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+  <div class="card">
+    <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">Cambiar Contraseña</h2>
+    <p style="color: var(--mute); font-size: 14px; margin-bottom: 20px;">
+      Actualiza tu clave de acceso ingresando tu contraseña actual y la nueva.
+    </p>
+
+    {% if form.errors or form.non_field_errors %}
+      <div class="alert-error">
+        Por favor corrige los errores marcados abajo para actualizar tu contraseña.
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      {% for field in form %}
+        <div class="form-group">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+
+          {% if field.errors %}
+            {% for error in field.errors %}
+              <span class="field-error">{{ error }}</span>
+            {% endfor %}
+          {% endif %}
+
+          {% if field.help_text %}
+            <div class="helptext">{{ field.help_text|safe }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="btn" style="width: 100%; margin-top: 8px;">Guardar nueva contraseña</button>
+    </form>
+
+    <div style="text-align: center;">
+      <a href="{% url 'encuesta_datos' %}" class="back-link">← Volver al inicio</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

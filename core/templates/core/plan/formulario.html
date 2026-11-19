@@ -1,106 +1,10 @@
-{% extends "core2/base.html" %}
+{% extends "core/base.html" %}
+{% load static %}
 
 {% block title %}Mis Datos | VitaSansano{% endblock %}
 
 {% block extra_head %}
-<style>
-  .encuesta-container {
-    width: 100%;
-    max-width: 680px;
-    margin: 0 auto;
-  }
-
-  /* Alerta visual con animación de parpadeo lento */
-  .alert-error {
-    background-color: #f8d7da;
-    color: #842029;
-    border: 1px solid #f5c2c7;
-    padding: 12px 16px;
-    border-radius: var(--ri);
-    margin-bottom: 20px;
-    font-size: 14px;
-    font-weight: 600;
-    animation: parpadeoLento 2.5s infinite ease-in-out;
-  }
-
-  @keyframes parpadeoLento {
-    0% { opacity: 1; }
-    50% { opacity: 0.55; }
-    100% { opacity: 1; }
-  }
-
-  .fm-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-  }
-
-  .fm-full {
-    grid-column: span 2;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .form-group label {
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--ink);
-  }
-
-  .form-group input,
-  .form-group select {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--ri);
-    padding: 11px 14px;
-    width: 100%;
-    font-family: inherit;
-    font-size: 15px;
-    color: var(--ink);
-    transition: border-color 0.2s;
-  }
-
-  .form-group input:focus,
-  .form-group select:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-    border-color: var(--accent);
-  }
-
-  .form-section-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--accent);
-    margin: 20px 0 8px 0;
-    padding-bottom: 6px;
-    border-bottom: 1px dashed var(--line);
-  }
-
-  @media (max-width: 580px) {
-    .fm-grid {
-      grid-template-columns: 1fr;
-    }
-    .fm-full {
-      grid-column: span 1;
-    }
-  }
-  .alert-error ul { margin: 0; padding-left: 18px; font-weight: 500; }
-
-  .bloques-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-  .bloque-op {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--ri); padding: 6px 10px;
-    font-size: 13px; font-weight: 500; cursor: pointer;
-  }
-  .bloque-op input { width: auto; margin: 0; }
-  .bloque-op:has(input:checked) { border-color: var(--accent); }
-  .hint { color: var(--mute); font-size: 12px; font-weight: 400; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/formulario.css' %}">
 {% endblock %}
 
 {% block content %}

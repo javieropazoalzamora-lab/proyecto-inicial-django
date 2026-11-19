@@ -19,6 +19,24 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _cargar_env(ruta):
+    """Lee un archivo .env (CLAVE=valor por línea) sin dependencias externas.
+
+    Las variables ya definidas en el sistema tienen prioridad. El archivo .env está en
+    .gitignore: ahí van las claves reales (correo, Gemini) y nunca se sube al repositorio."""
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding='utf-8').splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith('#') or '=' not in linea:
+            continue
+        clave, valor = linea.split('=', 1)
+        os.environ.setdefault(clave.strip(), valor.strip().strip('"').strip("'"))
+
+
+_cargar_env(BASE_DIR / '.env')
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
@@ -126,13 +144,55 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'   # destino de `collectstatic` en producción
+
+
+# Autenticación: una sola fuente de verdad para @login_required y login/logout
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'portal'
+LOGOUT_REDIRECT_URL = 'login'
+
+
+# Endurecimiento automático cuando DEBUG está desactivado (producción con HTTPS)
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SSL_REDIRECT', '1') != '0'
+    SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_HSTS_SECONDS', '0'))
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+# Si hay un servidor SMTP configurado en .env, los correos (activación de cuenta y
+# recuperación de clave) se envían de verdad. Si no, se imprimen en la consola.
+EMAIL_SMTP_HOST = os.environ.get('EMAIL_HOST', '').strip()
+
+if EMAIL_SMTP_HOST:
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": EMAIL_SMTP_HOST,
+                "port": int(os.environ.get('EMAIL_PORT', '587')),
+                "username": os.environ.get('EMAIL_HOST_USER', ''),
+                "password": os.environ.get('EMAIL_HOST_PASSWORD', ''),
+                "use_tls": os.environ.get('EMAIL_USE_TLS', '1') == '1',
+                "use_ssl": os.environ.get('EMAIL_USE_SSL', '0') == '1',
+                "timeout": 20,  # segundos: si el servidor no responde, el registro avisa en vez de quedarse colgado
+            },
+        }
     }
-}
+else:
+    MAILERS = {
+        "default": {
+            "BACKEND": "django.core.mail.backends.console.EmailBackend",
+        }
+    }
+
+# Remitente que verá el usuario, p. ej.: VitaSansano <tucuenta@gmail.com>
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    f"VitaSansano <{os.environ['EMAIL_HOST_USER']}>" if os.environ.get('EMAIL_HOST_USER') else 'VitaSansano <no-responder@localhost>',
+)
